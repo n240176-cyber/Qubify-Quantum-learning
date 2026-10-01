@@ -435,6 +435,20 @@ print(json.dumps({
   }
 });
   app.post('/api/quantum/execute', async (req, res) => {
+    if (process.env.ENABLE_CODE_LAB === 'false') {
+  return res.status(503).json({
+    success: false,
+    stderr: 'Code Lab execution is disabled on this public deployment.',
+    error: {
+      type: 'CodeLabDisabled',
+      rawMessage: 'Public arbitrary Python execution is disabled.',
+      qubifyExplanation:
+        'Qubify public deployment currently uses the controlled quantum simulation API for safe execution.',
+      suggestion:
+        'Use the interactive lessons and simulator. Code Lab can be enabled in a secured environment.',
+    },
+  });
+}
     const { code, files = [], timeoutMs = 20000 } = req.body;
 
     if (!code || typeof code !== 'string') {
