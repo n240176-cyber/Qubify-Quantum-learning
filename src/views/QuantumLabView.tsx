@@ -41,9 +41,12 @@ interface QuantumLabViewProps {
 }
 
 export const QuantumLabView: React.FC<QuantumLabViewProps> = ({
+
   onNavigate,
   onOpenProfile,
 }) => {
+  const isPublicCodeLabDisabled =
+  import.meta.env.VITE_ENABLE_CODE_LAB === 'false';
   // Tabs for multiple code files
   const [tabs, setTabs] = useState<CodeFileTab[]>([
     { id: 'tab-1', filename: 'main.py', code: STARTER_CODE },
@@ -155,6 +158,7 @@ export const QuantumLabView: React.FC<QuantumLabViewProps> = ({
   // Run Code
   const handleRunCode = async () => {
     if (isRunning) return;
+    if (isPublicCodeLabDisabled) return;
 
     setIsRunning(true);
     abortControllerRef.current = new AbortController();
@@ -649,14 +653,34 @@ export const QuantumLabView: React.FC<QuantumLabViewProps> = ({
                   <span>STOP</span>
                 </button>
               ) : (
-                <button
-                  id="run-quantum-code-btn"
-                  onClick={handleRunCode}
-                  className="px-5 py-1.5 bg-[#1FA7DA] hover:bg-[#27B4E8] text-white font-bold text-xs rounded-md transition-colors cursor-pointer flex items-center gap-1.5 shadow-sm active:scale-95"
-                >
-                  <Play className="w-3.5 h-3.5 fill-current" />
-                  <span>RUN CODE ▶</span>
-                </button>
+             <div className="flex items-center gap-3">
+  {isPublicCodeLabDisabled && (
+    <span className="hidden md:inline text-[11px] text-amber-400">
+      Public demo — code execution disabled for security
+    </span>
+  )}
+
+  <button
+    id="run-quantum-code-btn"
+    onClick={handleRunCode}
+    disabled={isPublicCodeLabDisabled}
+    title={
+      isPublicCodeLabDisabled
+        ? 'Code execution is disabled on the public demo. Qiskit-powered lessons and simulations remain available.'
+        : 'Run quantum code'
+    }
+    className={`px-5 py-1.5 text-white font-bold text-xs rounded-md transition-colors flex items-center gap-1.5 shadow-sm ${
+      isPublicCodeLabDisabled
+        ? 'bg-[#44474A] cursor-not-allowed opacity-70'
+        : 'bg-[#1FA7DA] hover:bg-[#27B4E8] cursor-pointer active:scale-95'
+    }`}
+  >
+    <Play className="w-3.5 h-3.5 fill-current" />
+    <span>
+      {isPublicCodeLabDisabled ? 'PUBLIC DEMO' : 'RUN CODE ▶'}
+    </span>
+  </button>
+</div>
               )}
             </div>
           </div>
