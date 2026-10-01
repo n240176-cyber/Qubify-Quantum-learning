@@ -1,3 +1,4 @@
+import { simulateLessonCircuit } from '../services/lessonQuantumSimulator';
 import React, { useState, useEffect } from 'react';
 import { LessonShell } from '../components/fullscreen-lesson/LessonShell';
 import { LessonNavControls } from '../components/fullscreen-lesson/LessonNavControls';
@@ -40,23 +41,46 @@ export const ShotsLessonView: React.FC<ShotsLessonViewProps> = ({
   const [step1ReadHistory, setStep1ReadHistory] = useState<Array<{ count: number; val: 0 | 1; note: string }>>([]);
   const [step1IsMeasuring, setStep1IsMeasuring] = useState(false);
 
-  const handleStep1MeasureInitial = () => {
-    if (step1IsMeasuring) return;
-    setStep1IsMeasuring(true);
-    // Random 0 or 1 with 50/50 probability
-    const outcome: 0 | 1 = Math.random() < 0.5 ? 0 : 1;
+ const handleStep1MeasureInitial = async () => {
+  if (step1IsMeasuring) return;
 
-    setTimeout(() => {
-      setStep1MeasuredVal(outcome);
-      setStep1State('collapsed');
-      setStep1ReadCount(1);
-      setStep1ReadHistory([
-        { count: 1, val: outcome, note: `Collapsed from superposition to |${outcome}⟩` },
-      ]);
-      setStep1IsMeasuring(false);
-      setMaxUnlockedStep((prev) => Math.max(prev, 2));
-    }, 450);
-  };
+  setStep1IsMeasuring(true);
+
+  const result = await simulateLessonCircuit({
+    numQubits: 1,
+    shots: 1,
+    operations: [
+      {
+        gate: 'h',
+        qubits: [0],
+      },
+    ],
+  });
+
+  if (!result.success || !result.memory?.length) {
+    console.error('Qiskit measurement failed:', result.error);
+    setStep1IsMeasuring(false);
+    return;
+  }
+
+  const outcome: 0 | 1 =
+    result.memory[0] === '1' ? 1 : 0;
+
+  setStep1MeasuredVal(outcome);
+  setStep1State('collapsed');
+  setStep1ReadCount(1);
+
+  setStep1ReadHistory([
+    {
+      count: 1,
+      val: outcome,
+      note: `Collapsed from superposition to |${outcome}⟩`,
+    },
+  ]);
+
+  setStep1IsMeasuring(false);
+  setMaxUnlockedStep((prev) => Math.max(prev, 2));
+};
 
   const handleStep1MeasureAgain = () => {
     if (step1State !== 'collapsed' || step1MeasuredVal === null || step1IsMeasuring) return;
@@ -120,28 +144,52 @@ export const ShotsLessonView: React.FC<ShotsLessonViewProps> = ({
   const [step3IsAnimating, setStep3IsAnimating] = useState<boolean>(false);
   const [step3ResultVal, setStep3ResultVal] = useState<0 | 1>(1);
 
-  const handleStep3RunShotAnimation = () => {
-    if (step3IsAnimating) return;
-    setStep3IsAnimating(true);
-    setStep3Stage('prepare');
+  const handleStep3RunShotAnimation = async () => {
+  if (step3IsAnimating) return;
+
+  setStep3IsAnimating(true);
+  setStep3Stage('prepare');
+
+  const result = await simulateLessonCircuit({
+    numQubits: 1,
+    shots: 1,
+    operations: [
+      {
+        gate: 'h',
+        qubits: [0],
+      },
+    ],
+  });
+
+  if (!result.success || !result.memory?.length) {
+    console.error('Qiskit shot failed:', result.error);
+    setStep3IsAnimating(false);
+    setStep3Stage('idle');
+    return;
+  }
+
+  const outcome: 0 | 1 =
+    result.memory[0] === '1' ? 1 : 0;
+
+  setTimeout(() => {
+    setStep3Stage('gate');
 
     setTimeout(() => {
-      setStep3Stage('gate');
+      setStep3Stage('measure');
+
       setTimeout(() => {
-        setStep3Stage('measure');
+        setStep3ResultVal(outcome);
+        setStep3Stage('result');
+
         setTimeout(() => {
-          const outcome: 0 | 1 = Math.random() < 0.5 ? 0 : 1;
-          setStep3ResultVal(outcome);
-          setStep3Stage('result');
-          setTimeout(() => {
-            setStep3Stage('reset');
-            setStep3IsAnimating(false);
-            setMaxUnlockedStep((prev) => Math.max(prev, 4));
-          }, 800);
-        }, 600);
+          setStep3Stage('reset');
+          setStep3IsAnimating(false);
+          setMaxUnlockedStep((prev) => Math.max(prev, 4));
+        }, 800);
       }, 600);
     }, 600);
-  };
+  }, 600);
+};
 
   // =========================================================================
   // STEP 4 STATE: Five Shots
@@ -156,32 +204,50 @@ export const ShotsLessonView: React.FC<ShotsLessonViewProps> = ({
   const [step4RevealedCount, setStep4RevealedCount] = useState<number>(5);
   const [step4IsRunning, setStep4IsRunning] = useState<boolean>(false);
 
-  const handleStep4RunFiveShots = () => {
-    if (step4IsRunning) return;
-    setStep4IsRunning(true);
-    setStep4RevealedCount(0);
+  const handleStep4RunFiveShots = async () => {
+  if (step4IsRunning) return;
 
-    // Generate 5 random results
-    const newShots: Array<{ id: number; result: 0 | 1 }> = [
-      { id: 1, result: Math.random() < 0.5 ? 0 : 1 },
-      { id: 2, result: Math.random() < 0.5 ? 0 : 1 },
-      { id: 3, result: Math.random() < 0.5 ? 0 : 1 },
-      { id: 4, result: Math.random() < 0.5 ? 0 : 1 },
-      { id: 5, result: Math.random() < 0.5 ? 0 : 1 },
-    ];
-    setStep4Shots(newShots);
+  setStep4IsRunning(true);
+  setStep4RevealedCount(0);
 
-    let current = 0;
-    const interval = setInterval(() => {
-      current += 1;
-      setStep4RevealedCount(current);
-      if (current >= 5) {
-        clearInterval(interval);
-        setStep4IsRunning(false);
-        setMaxUnlockedStep((prev) => Math.max(prev, 5));
-      }
-    }, 450);
-  };
+  const result = await simulateLessonCircuit({
+    numQubits: 1,
+    shots: 5,
+    operations: [
+      {
+        gate: 'h',
+        qubits: [0],
+      },
+    ],
+  });
+
+  if (!result.success || !result.memory?.length) {
+    console.error('Qiskit 5-shot run failed:', result.error);
+    setStep4IsRunning(false);
+    return;
+  }
+
+  const newShots: Array<{ id: number; result: 0 | 1 }> =
+    result.memory.slice(0, 5).map((value, index) => ({
+      id: index + 1,
+      result: value === '1' ? 1 : 0,
+    }));
+
+  setStep4Shots(newShots);
+
+  let current = 0;
+
+  const interval = setInterval(() => {
+    current += 1;
+    setStep4RevealedCount(current);
+
+    if (current >= newShots.length) {
+      clearInterval(interval);
+      setStep4IsRunning(false);
+      setMaxUnlockedStep((prev) => Math.max(prev, 5));
+    }
+  }, 450);
+};
 
   // =========================================================================
   // STEP 5 STATE: Five Measurements vs Five Shots (Comparison)
@@ -202,26 +268,47 @@ export const ShotsLessonView: React.FC<ShotsLessonViewProps> = ({
   const [step6HasRun100, setStep6HasRun100] = useState<boolean>(true);
   const [step6IsSampling, setStep6IsSampling] = useState<boolean>(false);
 
-  const handleStep6Run100Shots = () => {
-    if (step6IsSampling) return;
-    setStep6IsSampling(true);
+  const handleStep6Run100Shots = async () => {
+  if (step6IsSampling) return;
 
-    setTimeout(() => {
-      // Realistic binomial sampling for N=100 with p=0.5
-      let zeros = 0;
-      for (let i = 0; i < 100; i++) {
-        if (Math.random() < 0.5) zeros++;
-      }
-      const ones = 100 - zeros;
+  setStep6IsSampling(true);
 
-      setStep6ZeroCount(zeros);
-      setStep6OneCount(ones);
-      setStep6HasRun100(true);
-      setStep6IsSampling(false);
-      setMaxUnlockedStep((prev) => Math.max(prev, 7));
-    }, 400);
-  };
+  const result = await simulateLessonCircuit({
+    numQubits: 1,
+    shots: 100,
+    operations: [
+      {
+        gate: 'h',
+        qubits: [0],
+      },
+    ],
+  });
 
+  if (!result.success || !result.counts) {
+    console.error('Qiskit 100-shot run failed:', result.error);
+    setStep6IsSampling(false);
+    return;
+  }
+
+  const zeros = result.counts['0'] ?? 0;
+  const ones = result.counts['1'] ?? 0;
+
+  setStep6ZeroCount(zeros);
+  setStep6OneCount(ones);
+
+  if (result.memory?.length) {
+    setStep6SingleShotResult(
+      result.memory[0] === '1' ? 1 : 0
+    );
+  }
+
+  setStep6HasRun100(true);
+  setStep6IsSampling(false);
+
+  setMaxUnlockedStep((prev) =>
+    Math.max(prev, 7)
+  );
+};
   // Navigation Handlers
   const handleBack = () => {
     if (currentStep > 1) {
