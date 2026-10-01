@@ -7,6 +7,50 @@ import { createServer as createViteServer } from 'vite';
 
 async function startServer() {
   const app = express();
+  const allowedOrigins = (process.env.FRONTEND_URL || '')
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+
+  const isLocal =
+    origin?.startsWith('http://localhost:') ||
+    origin?.startsWith('http://127.0.0.1:');
+
+  const isAllowed =
+    !origin ||
+    isLocal ||
+    allowedOrigins.includes(origin);
+
+  if (!isAllowed) {
+    return res.status(403).json({
+      error: 'Origin not allowed',
+    });
+  }
+
+  if (origin) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Vary', 'Origin');
+  }
+
+  res.setHeader(
+    'Access-Control-Allow-Headers',
+    'Content-Type, Authorization'
+  );
+
+  res.setHeader(
+    'Access-Control-Allow-Methods',
+    'GET, POST, OPTIONS'
+  );
+
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(204);
+  }
+
+  next();
+});
 const PORT = Number(process.env.PORT) || 3000;
 
   // JSON request body parser
