@@ -1,4 +1,10 @@
 # Qubify — Interactive Quantum Learning with Qiskit
+## Live Demo
+
+🌐 **Qubify:** https://qubify.onrender.com/
+
+> The public deployment uses Qiskit Aer for real quantum-circuit simulation.  
+> IBM Quantum hardware integration is future scope.
 
 Qubify is a beginner-friendly interactive quantum computing learning platform designed to make the transition from quantum concepts to real Qiskit programming easier.
 
