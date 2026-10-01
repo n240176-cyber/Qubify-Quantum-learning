@@ -15,14 +15,25 @@ async function startServer() {
 app.use((req, res, next) => {
   const origin = req.headers.origin;
 
-  const isLocal =
-    origin?.startsWith('http://localhost:') ||
-    origin?.startsWith('http://127.0.0.1:');
+ const isLocal =
+  origin?.startsWith('http://localhost:') ||
+  origin?.startsWith('http://127.0.0.1:');
 
-  const isAllowed =
-    !origin ||
-    isLocal ||
-    allowedOrigins.includes(origin);
+let isSameOrigin = false;
+
+if (origin) {
+  try {
+    isSameOrigin = new URL(origin).host === req.headers.host;
+  } catch {
+    isSameOrigin = false;
+  }
+}
+
+const isAllowed =
+  !origin ||
+  isLocal ||
+  isSameOrigin ||
+  allowedOrigins.includes(origin);
 
   if (!isAllowed) {
     return res.status(403).json({
