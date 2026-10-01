@@ -93,39 +93,81 @@ print(json.dumps(status))
 
       const py = spawn('python3', ['-c', pyCode]);
       let stdout = '';
-      py.stdout.on('data', (d) => { stdout += d.toString(); });
-      py.on('close', (code) => {
-        if (code === 0 && stdout.trim()) {
-          try {
-            const parsed = JSON.parse(stdout.trim());
-            return res.json({
-              status: 'ready',
-              pythonVersion: `Python ${parsed.python || '3.10.12'}`,
-              qiskitVersion: `Qiskit ${parsed.packages?.qiskit || '2.5.2'}`,
-              aerVersion: `Qiskit Aer ${parsed.packages?.qiskit_aer || '0.17.2'}`,
-              backend: 'AerSimulator (Local High-Performance CPU)',
-              provider: 'AerSandboxProvider',
-              packages: parsed.packages,
-              capabilities: parsed.capabilities,
-              simulationMethods: parsed.simulationMethods || [
-                'automatic', 'statevector', 'density_matrix', 'stabilizer',
-                'matrix_product_state', 'extended_stabilizer', 'unitary', 'superop'
-              ],
-            });
-          } catch {}
-        }
+let responded = false;
 
-        return res.json({
-          status: 'ready',
-          pythonVersion: 'Python 3.10.12',
-          qiskitVersion: 'Qiskit 2.5.2',
-          aerVersion: 'Qiskit Aer 0.17.2',
-          backend: 'AerSimulator (CPU Sandbox)',
-          provider: 'AerSandboxProvider',
-          packages: { python: '3.10.12', qiskit: '2.5.2', qiskit_aer: '0.17.2', numpy: '2.2.6', scipy: '1.15.3', matplotlib: '3.10.9' },
-          simulationMethods: ['automatic', 'statevector', 'density_matrix', 'stabilizer', 'matrix_product_state'],
-        });
+py.stdout.on('data', (d) => {
+  stdout += d.toString();
+});
+
+py.on('close', (code) => {
+  if (responded) return;
+  responded = true;
+
+  if (code === 0 && stdout.trim()) {
+    try {
+      const parsed = JSON.parse(stdout.trim());
+
+      const qiskitReady =
+        !!parsed.packages?.qiskit &&
+        !!parsed.packages?.qiskit_aer;
+
+      return res.json({
+        status: qiskitReady ? 'ready' : 'offline',
+        pythonVersion: parsed.python
+          ? `Python ${parsed.python}`
+          : 'Unknown',
+        qiskitVersion: parsed.packages?.qiskit
+          ? `Qiskit ${parsed.packages.qiskit}`
+          : 'Unknown',
+        aerVersion: parsed.packages?.qiskit_aer
+          ? `Qiskit Aer ${parsed.packages.qiskit_aer}`
+          : 'Unknown',
+        backend: qiskitReady
+          ? 'AerSimulator (Local CPU)'
+          : 'Unavailable',
+        provider: qiskitReady
+          ? 'Qiskit Aer'
+          : 'Unavailable',
+        packages: parsed.packages ?? {},
+        capabilities: parsed.capabilities ?? [],
+        simulationMethods: parsed.simulationMethods ?? [],
       });
+    } catch (error) {
+      console.error('Failed to parse quantum status:', error);
+    }
+  }
+
+  return res.json({
+    status: 'offline',
+    pythonVersion: 'Unknown',
+    qiskitVersion: 'Unknown',
+    aerVersion: 'Unknown',
+    backend: 'Unavailable',
+    provider: 'Unavailable',
+    packages: {},
+    capabilities: [],
+    simulationMethods: [],
+  });
+});
+
+py.on('error', (error) => {
+  if (responded) return;
+  responded = true;
+
+  console.error('Quantum status process failed:', error);
+
+  return res.json({
+    status: 'offline',
+    pythonVersion: 'Unknown',
+    qiskitVersion: 'Unknown',
+    aerVersion: 'Unknown',
+    backend: 'Unavailable',
+    provider: 'Unavailable',
+    packages: {},
+    capabilities: [],
+    simulationMethods: [],
+  });
+});
 
       py.on('error', () => {
         res.json({
