@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Qubify Quantum Code Lab — Powered by Qiskit</title>
+    <meta name="description" content="Professional Quantum Code Lab powered by Qiskit with real Python execution, error intelligence, and interactive quantum computing curriculum." />
+    <meta property="og:title" content="Qubify Quantum Code Lab — Powered by Qiskit" />
+    <meta property="og:description" content="Professional Quantum Code Lab powered by Qiskit with real Python execution, error intelligence, and interactive quantum computing curriculum." />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Nunito+Sans:ital,opsz,wght@0,6..12,400..800;1,6..12,400..800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <script>
+      // Prevent and suppress benign ResizeObserver loop limit errors
+      (function() {
+        function isResizeObserverError(msg) {
+          if (!msg) return false;
+          var str = typeof msg === 'string' ? msg : (msg.message || String(msg));
+          return (
+            str.indexOf('ResizeObserver loop completed with undelivered notifications') !== -1 ||
+            str.indexOf('ResizeObserver loop limit exceeded') !== -1
+          );
+        }
+
+        if (typeof window !== 'undefined' && window.ResizeObserver) {
+          var OriginalRO = window.ResizeObserver;
+          window.ResizeObserver = class extends OriginalRO {
+            constructor(callback) {
+              super(function(entries, observer) {
+                window.requestAnimationFrame(function() {
+                  try {
+                    callback(entries, observer);
+                  } catch (err) {
+                    if (!isResizeObserverError(err)) {
+                      throw err;
+                    }
+                  }
+                });
+              });
+            }
+          };
+        }
+
+        window.addEventListener('error', function(e) {
+          if (isResizeObserverError(e.message) || (e.error && isResizeObserverError(e.error.message))) {
+            e.stopImmediatePropagation();
+            e.preventDefault();
+            return false;
+          }
+        }, true);
+
+        window.addEventListener('unhandledrejection', function(e) {
+          var reason = e && e.reason;
+          if (reason && isResizeObserverError(reason.message || reason)) {
+            e.stopImmediatePropagation();
+            e.preventDefault();
+            return false;
+          }
+        }, true);
+      })();
+    </script>
+  </head>
+  <body class="bg-[#232425] text-[#F1F1F1] font-sans antialiased selection:bg-[#1FA7DA]/30 selection:text-white">
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+
