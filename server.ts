@@ -445,7 +445,16 @@ print(json.dumps({
     });
   }
 });
-  app.post('/api/quantum/execute', async (req, res) => {
+
+ app.get('/api/health', (_req, res) => {
+  res.json({
+    status: 'ok',
+    service: 'Qubify',
+  });
+});
+
+app.get('/api/quantum/status', async (req, res) => {
+
     if (process.env.ENABLE_CODE_LAB === 'false') {
   return res.status(503).json({
     success: false,
