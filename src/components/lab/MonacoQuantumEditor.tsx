@@ -57,7 +57,7 @@ export const MonacoQuantumEditor: React.FC<MonacoQuantumEditorProps> = ({
     });
 
     // Track cursor movements for bottom status bar
-    editor.onDidChangeCursorPosition((e) => {
+  editor.onDidChangeCursorPosition((e: any) => {
       if (onCursorChange) {
         onCursorChange({ line: e.position.lineNumber, column: e.position.column });
       }
