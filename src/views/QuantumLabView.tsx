@@ -1,4 +1,3 @@
-import { executePublicQiskitCode } from '../services/publicCodeLabRunner';
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   Play, 
@@ -170,13 +169,11 @@ export const QuantumLabView: React.FC<QuantumLabViewProps> = ({
       .map((t) => ({ filename: t.filename, code: t.code }));
 
     try {
-      const result = isPublicCodeLabDisabled
-  ? await executePublicQiskitCode(activeFile.code)
-  : await executeQuantumCode(
-      activeFile.code,
-      abortControllerRef.current.signal,
-      workspaceFiles
-    );
+      const result = await executeQuantumCode(
+  activeFile.code,
+  abortControllerRef.current.signal,
+  isPublicCodeLabDisabled ? [] : workspaceFiles
+);
       setExecutionResult(result);
 
       // Record to run history

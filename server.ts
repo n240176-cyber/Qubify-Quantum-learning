@@ -238,6 +238,259 @@ py.on('error', (error) => {
       res.json({ status: 'offline', pythonVersion: 'Unknown', qiskitVersion: 'Unknown', aerVersion: 'Unknown', backend: 'Unavailable' });
     }
   });
+  async function validateRestrictedQiskitCode(
+  code: string
+): Promise<{ ok: boolean; error?: string }> {
+  return new Promise((resolve) => {
+    if (!code || code.length > 20000) {
+      return resolve({
+        ok: false,
+        error: 'Code must be between 1 and 20,000 characters.',
+      });
+    }
+
+    const validatorCode = String.raw`
+import ast
+import json
+import sys
+
+code = sys.stdin.read()
+
+ALLOWED_MODULES = (
+    "math",
+    "numpy",
+    "qiskit",
+    "qiskit_aer",
+    "qiskit.quantum_info",
+    "qiskit.circuit",
+    "qiskit_aer.noise",
+    "matplotlib.pyplot",
+)
+
+BANNED_NAMES = {
+    "os",
+    "sys",
+    "subprocess",
+    "socket",
+    "pathlib",
+    "shutil",
+    "builtins",
+    "importlib",
+    "ctypes",
+    "multiprocessing",
+    "threading",
+    "requests",
+    "urllib",
+    "http",
+    "pickle",
+    "marshal",
+    "__import__",
+    "eval",
+    "exec",
+    "compile",
+    "open",
+    "input",
+    "breakpoint",
+    "globals",
+    "locals",
+    "vars",
+    "getattr",
+    "setattr",
+    "delattr",
+}
+
+BANNED_ATTRIBUTES = {
+    "system",
+    "popen",
+    "spawn",
+    "fork",
+    "exec",
+    "connect",
+    "listen",
+    "accept",
+    "send",
+    "recv",
+    "savefig",
+    "imsave",
+    "save",
+    "load",
+    "dump",
+}
+
+BLOCKED_NODE_TYPES = (
+    ast.ClassDef,
+    ast.AsyncFunctionDef,
+    ast.AsyncFor,
+    ast.AsyncWith,
+    ast.Await,
+    ast.With,
+    ast.While,
+    ast.Global,
+    ast.Nonlocal,
+    ast.Delete,
+    ast.Yield,
+    ast.YieldFrom,
+)
+
+def allowed_module(name):
+    return any(
+        name == allowed or name.startswith(allowed + ".")
+        for allowed in ALLOWED_MODULES
+    )
+
+try:
+    tree = ast.parse(code)
+
+    nodes = list(ast.walk(tree))
+
+    if len(nodes) > 1500:
+        raise ValueError("Program is too large for public Code Lab mode.")
+
+    for node in nodes:
+
+        if isinstance(node, BLOCKED_NODE_TYPES):
+            raise ValueError(
+                f"{type(node).__name__} is not supported in public Code Lab mode."
+            )
+
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                if not allowed_module(alias.name):
+                    raise ValueError(
+                        f"Import '{alias.name}' is not allowed."
+                    )
+
+        if isinstance(node, ast.ImportFrom):
+            module = node.module or ""
+
+            if not allowed_module(module):
+                raise ValueError(
+                    f"Import from '{module}' is not allowed."
+                )
+
+            for alias in node.names:
+                if alias.name == "*":
+                    raise ValueError(
+                        "Wildcard imports are not allowed."
+                    )
+
+        if isinstance(node, ast.Name):
+            if node.id in BANNED_NAMES:
+                raise ValueError(
+                    f"'{node.id}' is not available in public Code Lab mode."
+                )
+
+        if isinstance(node, ast.Attribute):
+            if node.attr.startswith("_"):
+                raise ValueError(
+                    "Private/dunder attribute access is not allowed."
+                )
+
+            if node.attr in BANNED_ATTRIBUTES:
+                raise ValueError(
+                    f"Attribute '{node.attr}' is not allowed."
+                )
+
+        if isinstance(node, ast.Call):
+
+            if isinstance(node.func, ast.Name):
+                if node.func.id in BANNED_NAMES:
+                    raise ValueError(
+                        f"Call to '{node.func.id}' is not allowed."
+                    )
+
+        if isinstance(node, ast.FunctionDef):
+            if node.decorator_list:
+                raise ValueError(
+                    "Function decorators are not allowed."
+                )
+
+    print(json.dumps({
+        "ok": True
+    }))
+
+except SyntaxError as error:
+    print(json.dumps({
+        "ok": False,
+        "error": f"Python syntax error on line {error.lineno}: {error.msg}"
+    }))
+
+except Exception as error:
+    print(json.dumps({
+        "ok": False,
+        "error": str(error)
+    }))
+`;
+
+    const validator = spawn(
+      'python3',
+      ['-c', validatorCode]
+    );
+
+    let stdout = '';
+    let stderr = '';
+    let finished = false;
+
+    const finish = (
+      result: { ok: boolean; error?: string }
+    ) => {
+      if (finished) return;
+      finished = true;
+      resolve(result);
+    };
+
+    const timeout = setTimeout(() => {
+      validator.kill('SIGKILL');
+
+      finish({
+        ok: false,
+        error: 'Code validation timed out.',
+      });
+    }, 3000);
+
+    validator.stdout.on('data', (data) => {
+      stdout += data.toString();
+    });
+
+    validator.stderr.on('data', (data) => {
+      stderr += data.toString();
+    });
+
+    validator.on('error', (error) => {
+      clearTimeout(timeout);
+
+      finish({
+        ok: false,
+        error: `Validator unavailable: ${error.message}`,
+      });
+    });
+
+    validator.on('close', () => {
+      clearTimeout(timeout);
+
+      if (finished) return;
+
+      try {
+        const result = JSON.parse(stdout.trim());
+
+        finish({
+          ok: Boolean(result.ok),
+          error: result.error,
+        });
+      } catch {
+        finish({
+          ok: false,
+          error:
+            stderr ||
+            'Could not validate the quantum program.',
+        });
+      }
+    });
+
+    validator.stdin.write(code);
+    validator.stdin.end();
+  });
+}
 
   // =========================================================================
   // QUANTUM API: Execute Python + Qiskit Code in Sandboxed Worker
@@ -452,31 +705,43 @@ print(json.dumps({
     service: 'Qubify',
   });
 });
+app.post('/api/quantum/execute', async (req, res) => {
+  const { code, files = [], timeoutMs = 20000 } = req.body;
 
-app.get('/api/quantum/status', async (req, res) => {
+  if (!code || typeof code !== 'string') {
+    return res.status(400).json({
+      success: false,
+      stderr: 'Error: No Python code provided for execution.',
+    });
+  }
 
-    if (process.env.ENABLE_CODE_LAB === 'false') {
-  return res.status(503).json({
-    success: false,
-    stderr: 'Code Lab execution is disabled on this public deployment.',
-    error: {
-      type: 'CodeLabDisabled',
-      rawMessage: 'Public arbitrary Python execution is disabled.',
-      qubifyExplanation:
-        'Qubify public deployment currently uses the controlled quantum simulation API for safe execution.',
-      suggestion:
-        'Use the interactive lessons and simulator. Code Lab can be enabled in a secured environment.',
-    },
-  });
-}
-    const { code, files = [], timeoutMs = 20000 } = req.body;
+  const isPublicRestrictedMode =
+    process.env.ENABLE_CODE_LAB === 'false';
 
-    if (!code || typeof code !== 'string') {
+  if (isPublicRestrictedMode) {
+    const validation = await validateRestrictedQiskitCode(code);
+
+    if (!validation.ok) {
       return res.status(400).json({
         success: false,
-        stderr: 'Error: No Python code provided for execution.',
+        stdout: '',
+        stderr:
+          validation.error ||
+          'Code is not allowed in public Qiskit mode.',
+        executionTimeMs: 0,
+        error: {
+          type: 'PublicCodeValidationError',
+          rawMessage:
+            validation.error ||
+            'Code is not allowed in public Qiskit mode.',
+          qubifyExplanation:
+            'The public Qubify Code Lab allows supported Python and Qiskit operations while blocking system, filesystem, process, and network access.',
+          suggestion:
+            'Use Qiskit, Qiskit Aer, math, NumPy, supported quantum-info tools, noise models, transpilation, and circuit visualization.',
+        },
       });
     }
+  }
 
     const runId = `QL-${Math.floor(1000 + Math.random() * 9000)}`;
 
@@ -710,14 +975,22 @@ with open('_qubify_out.json', 'w', encoding='utf-8') as f:
 
       // Spawn Python process in isolated runDir
       const pythonProcess = spawn('python3', ['_qubify_harness.py'], {
-        cwd: runDir,
-        timeout: Math.min(timeoutMs, 25000),
-        env: {
-          ...process.env,
-          PYTHONUNBUFFERED: '1',
-          PYTHONDONTWRITEBYTECODE: '1',
-        },
-      });
+  cwd: runDir,
+  timeout: Math.min(timeoutMs, 25000),
+  env: {
+    ...process.env,
+    PYTHONUNBUFFERED: '1',
+    PYTHONDONTWRITEBYTECODE: '1',
+
+    // Keep scientific libraries within Render/local resource limits
+    OMP_NUM_THREADS: '1',
+    OPENBLAS_NUM_THREADS: '1',
+    MKL_NUM_THREADS: '1',
+    NUMEXPR_NUM_THREADS: '1',
+    BLIS_NUM_THREADS: '1',
+    VECLIB_MAXIMUM_THREADS: '1',
+  },
+});
 
       let procStdout = '';
       let procStderr = '';
