@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { AppView, LearningNodeItem, UserStats, ChallengeItem } from './types';
-import { 
-  BEGINNER_NODES, 
-  INTERMEDIATE_NODES, 
-  INITIAL_USER_STATS, 
-  CHALLENGE_LIST 
+import {
+  BEGINNER_NODES,
+  INTERMEDIATE_NODES,
+  INITIAL_USER_STATS,
+  CHALLENGE_LIST,
+  CURRICULUM_SECTIONS,
 } from './data/learningData';
 
 // Reusable Navigation & Common Components
@@ -12,7 +13,7 @@ import { AIHelpButton } from './components/common/AIHelpButton';
 import { ProfileModal } from './components/common/ProfileModal';
 
 // Auth & Intro Components
-import { IntroScreen } from './components/auth/IntroScreen';
+import { QubifyIntroView } from './views/QubifyIntroView';
 import { PrototypeLoginScreen } from './components/auth/PrototypeLoginScreen';
 import { AuthProvider } from './context/AuthContext';
 
@@ -24,6 +25,7 @@ import { AppShell } from './components/navigation/AppShell';
 import { LearnerDashboard } from './views/LearnerDashboard';
 import { LearningPathView } from './views/LearningPathView';
 import { LessonTemplateView } from './views/LessonTemplateView';
+import { ClassicalVsQuantumLessonView } from './views/ClassicalVsQuantumLessonView';
 import { BitLessonView } from './views/BitLessonView';
 import { ProbabilityLessonView } from './views/ProbabilityLessonView';
 import { QubitLessonView } from './views/QubitLessonView';
@@ -38,10 +40,34 @@ import { ZGateLessonView } from './views/ZGateLessonView';
 import { YGateLessonView } from './views/YGateLessonView';
 import { SingleQubitComparisonView } from './views/SingleQubitComparisonView';
 import { RotationGatesLessonView } from './views/RotationGatesLessonView';
+import { MultipleQubitsLessonView } from './views/MultipleQubitsLessonView';
+import { CNOTGateLessonView } from './views/CNOTGateLessonView';
+import { EntanglementLessonView } from './views/EntanglementLessonView';
+import { BellStateLessonView } from './views/BellStateLessonView';
 import { QuantumLabView } from './views/QuantumLabView';
 import { ChallengesView } from './views/ChallengesView';
 import { ProgressView } from './views/ProgressView';
 
+const getTrackedUserIdFromStorage = (): string | null => {
+  try {
+    const savedUser = localStorage.getItem('qubify_prototype_user');
+
+    if (!savedUser) return null;
+
+    const user = JSON.parse(savedUser);
+
+    if (user?.tracked === true && user?.id) {
+      return user.id;
+    }
+  } catch {}
+
+  return null;
+};
+
+const userStorageKey = (
+  userId: string,
+  key: string
+) => `qubify_${userId}_${key}`;
 export default function App() {
   // 1. Intro Screen State (plays on initial open, ~2s)
   const [hasSeenIntro, setHasSeenIntro] = useState<boolean>(() => {
@@ -61,121 +87,612 @@ export default function App() {
     }
   });
 
-  // Navigation View State
-  const [currentView, setCurrentView] = useState<AppView>('dashboard');
-  
-  // User & Curriculum State with localStorage persistence
-  const [userStats, setUserStats] = useState<UserStats>(() => {
-    try {
-      const saved = localStorage.getItem('qubify_user_stats');
-      if (saved) return JSON.parse(saved);
-    } catch {}
-    return { ...INITIAL_USER_STATS, name: 'Qubify Learner' };
+ // Navigation View State
+const [currentView, setCurrentView] =
+  useState<AppView>('dashboard');
+
+// The currently tracked demo user.
+// null = guest or logged out.
+const [
+  activeTrackedUserId,
+  setActiveTrackedUserId,
+] = useState<string | null>(() =>
+  getTrackedUserIdFromStorage()
+);
+
+// ---------------------------------------------------------
+// USER STATS
+// ---------------------------------------------------------
+
+const [userStats, setUserStats] =
+  useState<UserStats>(() => {
+    const userId =
+      getTrackedUserIdFromStorage();
+
+    if (userId) {
+      try {
+        const saved = localStorage.getItem(
+          userStorageKey(
+            userId,
+            'user_stats'
+          )
+        );
+
+        if (saved) {
+          return JSON.parse(saved);
+        }
+      } catch {}
+    }
+
+    return {
+      ...INITIAL_USER_STATS,
+      name: 'Qubify Learner',
+    };
   });
 
-  const [beginnerNodes, setBeginnerNodes] = useState<LearningNodeItem[]>(() => {
-    try {
-      const saved = localStorage.getItem('qubify_beginner_nodes');
-      if (saved) return JSON.parse(saved);
-    } catch {}
-    return BEGINNER_NODES;
-  });
+// ---------------------------------------------------------
+// BEGINNER NODES
+// ---------------------------------------------------------
 
-  const [intermediateNodes, setIntermediateNodes] = useState<LearningNodeItem[]>(() => {
-    try {
-      const saved = localStorage.getItem('qubify_intermediate_nodes');
-      if (saved) return JSON.parse(saved);
-    } catch {}
-    return INTERMEDIATE_NODES;
-  });
+const [
+  beginnerNodes,
+  setBeginnerNodes,
+] = useState<LearningNodeItem[]>(() => {
+  const userId =
+    getTrackedUserIdFromStorage();
 
-  const [challenges, setChallenges] = useState<ChallengeItem[]>(() => {
+  if (userId) {
     try {
-      const saved = localStorage.getItem('qubify_challenges');
-      if (saved) return JSON.parse(saved);
+      const saved = localStorage.getItem(
+        userStorageKey(
+          userId,
+          'beginner_nodes'
+        )
+      );
+
+      if (saved) {
+        return JSON.parse(saved);
+      }
     } catch {}
-    return CHALLENGE_LIST;
-  });
-  
-  // Selected lesson for the Lesson Page Template (defaults to Lesson 1: Bit)
-  const [selectedLesson, setSelectedLesson] = useState<LearningNodeItem>(
-    beginnerNodes[0] || BEGINNER_NODES[0]
+  }
+
+  return BEGINNER_NODES;
+});
+
+// ---------------------------------------------------------
+// INTERMEDIATE NODES
+// ---------------------------------------------------------
+
+const [
+  intermediateNodes,
+  setIntermediateNodes,
+] = useState<LearningNodeItem[]>(() => {
+  const userId =
+    getTrackedUserIdFromStorage();
+
+  if (userId) {
+    try {
+      const saved = localStorage.getItem(
+        userStorageKey(
+          userId,
+          'intermediate_nodes'
+        )
+      );
+
+      if (saved) {
+        return JSON.parse(saved);
+      }
+    } catch {}
+  }
+
+  return INTERMEDIATE_NODES;
+});
+
+// ---------------------------------------------------------
+// CHALLENGES
+// ---------------------------------------------------------
+
+const [
+  challenges,
+  setChallenges,
+] = useState<ChallengeItem[]>(() => {
+  const userId =
+    getTrackedUserIdFromStorage();
+
+  if (userId) {
+    try {
+      const saved = localStorage.getItem(
+        userStorageKey(
+          userId,
+          'challenges'
+        )
+      );
+
+      if (saved) {
+        return JSON.parse(saved);
+      }
+    } catch {}
+  }
+
+  return CHALLENGE_LIST;
+});
+
+// ---------------------------------------------------------
+// SELECTED LESSON
+// ---------------------------------------------------------
+
+const [
+  selectedLesson,
+  setSelectedLesson,
+] = useState<LearningNodeItem>(
+  beginnerNodes[0] ||
+    BEGINNER_NODES[0]
+);
+
+// Profile modal
+const [
+  isProfileOpen,
+  setIsProfileOpen,
+] = useState(false);
+
+// ---------------------------------------------------------
+// LOAD ONE USER'S SAVED PROGRESS
+// ---------------------------------------------------------
+
+const loadProgressForUser = (
+  userId: string,
+  userName: string
+) => {
+  let nextStats: UserStats = {
+    ...INITIAL_USER_STATS,
+    name: userName,
+  };
+
+  let nextBeginner =
+    BEGINNER_NODES;
+
+  let nextIntermediate =
+    INTERMEDIATE_NODES;
+
+  let nextChallenges =
+    CHALLENGE_LIST;
+
+  try {
+    const savedStats =
+      localStorage.getItem(
+        userStorageKey(
+          userId,
+          'user_stats'
+        )
+      );
+
+    if (savedStats) {
+      nextStats = {
+        ...JSON.parse(savedStats),
+        name: userName,
+      };
+    }
+
+    const savedBeginner =
+      localStorage.getItem(
+        userStorageKey(
+          userId,
+          'beginner_nodes'
+        )
+      );
+
+    if (savedBeginner) {
+      nextBeginner =
+        JSON.parse(savedBeginner);
+    }
+
+    const savedIntermediate =
+      localStorage.getItem(
+        userStorageKey(
+          userId,
+          'intermediate_nodes'
+        )
+      );
+
+    if (savedIntermediate) {
+      nextIntermediate =
+        JSON.parse(
+          savedIntermediate
+        );
+    }
+
+    const savedChallenges =
+      localStorage.getItem(
+        userStorageKey(
+          userId,
+          'challenges'
+        )
+      );
+
+    if (savedChallenges) {
+      nextChallenges =
+        JSON.parse(savedChallenges);
+    }
+  } catch {}
+
+  setUserStats(nextStats);
+  setBeginnerNodes(nextBeginner);
+  setIntermediateNodes(
+    nextIntermediate
   );
+  setChallenges(nextChallenges);
 
-  // Profile modal toggle
-  const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const allNodes = [
+    ...nextBeginner,
+    ...nextIntermediate,
+  ];
 
-  // Sync state to localStorage
-  useEffect(() => {
-    try {
-      localStorage.setItem('qubify_user_stats', JSON.stringify(userStats));
-    } catch {}
-  }, [userStats]);
+  const currentNode =
+    allNodes.find(
+      (node) =>
+        node.status === 'current'
+    ) ||
+    nextBeginner[0] ||
+    BEGINNER_NODES[0];
 
-  useEffect(() => {
-    try {
-      localStorage.setItem('qubify_beginner_nodes', JSON.stringify(beginnerNodes));
-    } catch {}
-  }, [beginnerNodes]);
+  setSelectedLesson(currentNode);
+};
 
-  useEffect(() => {
-    try {
-      localStorage.setItem('qubify_intermediate_nodes', JSON.stringify(intermediateNodes));
-    } catch {}
-  }, [intermediateNodes]);
+// ---------------------------------------------------------
+// SAVE ONLY TRACKED USERS
+// ---------------------------------------------------------
 
-  useEffect(() => {
-    try {
-      localStorage.setItem('qubify_challenges', JSON.stringify(challenges));
-    } catch {}
-  }, [challenges]);
+useEffect(() => {
+  if (!activeTrackedUserId) return;
+
+  try {
+    localStorage.setItem(
+      userStorageKey(
+        activeTrackedUserId,
+        'user_stats'
+      ),
+      JSON.stringify(userStats)
+    );
+  } catch {}
+}, [
+  userStats,
+  activeTrackedUserId,
+]);
+
+useEffect(() => {
+  if (!activeTrackedUserId) return;
+
+  try {
+    localStorage.setItem(
+      userStorageKey(
+        activeTrackedUserId,
+        'beginner_nodes'
+      ),
+      JSON.stringify(
+        beginnerNodes
+      )
+    );
+  } catch {}
+}, [
+  beginnerNodes,
+  activeTrackedUserId,
+]);
+
+useEffect(() => {
+  if (!activeTrackedUserId) return;
+
+  try {
+    localStorage.setItem(
+      userStorageKey(
+        activeTrackedUserId,
+        'intermediate_nodes'
+      ),
+      JSON.stringify(
+        intermediateNodes
+      )
+    );
+  } catch {}
+}, [
+  intermediateNodes,
+  activeTrackedUserId,
+]);
+
+useEffect(() => {
+  if (!activeTrackedUserId) return;
+
+  try {
+    localStorage.setItem(
+      userStorageKey(
+        activeTrackedUserId,
+        'challenges'
+      ),
+      JSON.stringify(challenges)
+    );
+  } catch {}
+}, [
+  challenges,
+  activeTrackedUserId,
+]);
 
   // Prototype login handler
-  const handlePrototypeLogin = async () => {
-    // 500ms simulated login
-    await new Promise((resolve) => setTimeout(resolve, 500));
-    try {
-      localStorage.setItem('qubify_is_authenticated', 'true');
-      localStorage.setItem(
-        'qubify_prototype_user',
-        JSON.stringify({
-          id: 'qub-learner-1',
-          name: userStats.name || 'Qubify Learner',
-          email: 'learner@qubify.demo',
-          avatar: 'QL',
-          provider: 'prototype-google',
-        })
-      );
-    } catch {}
-    setIsAuthenticated(true);
-    setCurrentView('dashboard');
-  };
+  
+// Demo tracked login handler
+const handlePrototypeLogin = async (
+  email: string,
+  password: string
+): Promise<{
+  success: boolean;
+  error?: string;
+}> => {
+  await new Promise((resolve) =>
+    setTimeout(resolve, 450)
+  );
 
+  const demoUsers = [
+    {
+      id: 'qub-demo-1',
+      name: 'Demo Learner 1',
+      email: 'student1@qubify.demo',
+      password: 'qubify123',
+      avatar: 'D1',
+    },
+    {
+      id: 'qub-demo-2',
+      name: 'Demo Learner 2',
+      email: 'student2@qubify.demo',
+      password: 'qubify123',
+      avatar: 'D2',
+    },
+    {
+      id: 'qub-demo-3',
+      name: 'Demo Learner 3',
+      email: 'student3@qubify.demo',
+      password: 'qubify123',
+      avatar: 'D3',
+    },
+  ];
+
+  const normalizedEmail =
+    email.trim().toLowerCase();
+
+  const user = demoUsers.find(
+    (candidate) =>
+      candidate.email ===
+        normalizedEmail &&
+      candidate.password ===
+        password
+  );
+
+  if (!user) {
+    return {
+      success: false,
+      error:
+        'Invalid demo email or password.',
+    };
+  }
+
+  try {
+    localStorage.setItem(
+      'qubify_is_authenticated',
+      'true'
+    );
+
+    localStorage.setItem(
+      'qubify_prototype_user',
+      JSON.stringify({
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        avatar: user.avatar,
+        provider: 'demo-account',
+        tracked: true,
+      })
+    );
+  } catch {}
+
+ setActiveTrackedUserId(
+  user.id
+);
+
+loadProgressForUser(
+  user.id,
+  user.name
+);
+
+setIsAuthenticated(true);
+setCurrentView('dashboard');
+
+  return {
+    success: true,
+  };
+};
+
+// Guest login handler
+const handleGuestLogin = async () => {
+  await new Promise((resolve) =>
+    setTimeout(resolve, 250)
+  );
+
+  try {
+    localStorage.setItem(
+      'qubify_is_authenticated',
+      'true'
+    );
+
+    localStorage.setItem(
+      'qubify_prototype_user',
+      JSON.stringify({
+        id: 'guest',
+        name: 'Guest Learner',
+        email: null,
+        avatar: 'G',
+        provider: 'guest',
+        tracked: false,
+      })
+    );
+  } catch {}
+
+  setUserStats((prev) => ({
+    ...prev,
+    name: 'Guest Learner',
+  }));
+setActiveTrackedUserId(null);
+
+setUserStats({
+  ...INITIAL_USER_STATS,
+  name: 'Guest Learner',
+});
+
+setBeginnerNodes(
+  BEGINNER_NODES
+);
+
+setIntermediateNodes(
+  INTERMEDIATE_NODES
+);
+
+setChallenges(
+  CHALLENGE_LIST
+);
+
+setSelectedLesson(
+  BEGINNER_NODES[0]
+);
+  setIsAuthenticated(true);
+  setCurrentView('dashboard');
+};
   // Prototype logout handler (returns to login screen, keeps learning progress)
   const handleLogout = () => {
-    try {
-      localStorage.setItem('qubify_is_authenticated', 'false');
-    } catch {}
-    setIsAuthenticated(false);
-  };
+  try {
+    localStorage.setItem(
+      'qubify_is_authenticated',
+      'false'
+    );
+
+    localStorage.removeItem(
+      'qubify_prototype_user'
+    );
+  } catch {}
+
+  setActiveTrackedUserId(null);
+  setIsAuthenticated(false);
+};
 
   // Reset Prototype Progress
-  const handleResetProgress = () => {
-    try {
-      localStorage.removeItem('qubify_user_stats');
-      localStorage.removeItem('qubify_beginner_nodes');
-      localStorage.removeItem('qubify_intermediate_nodes');
-      localStorage.removeItem('qubify_challenges');
-      localStorage.removeItem('qubify_weekly_challenges');
-      localStorage.removeItem('qubify_lab_run_history');
-    } catch {}
-    setUserStats({ ...INITIAL_USER_STATS, name: 'Qubify Learner' });
-    setBeginnerNodes(BEGINNER_NODES);
-    setIntermediateNodes(INTERMEDIATE_NODES);
-    setChallenges(CHALLENGE_LIST);
-    setSelectedLesson(BEGINNER_NODES[0]);
-    setCurrentView('dashboard');
-  };
+const handleResetProgress = () => {
+  let learnerName = 'Qubify Learner';
+  let learnerId: string | null = null;
+
+  try {
+    // Keep the logged-in account, but remove its learning data.
+    const rawUser = localStorage.getItem(
+      'qubify_prototype_user'
+    );
+
+    if (rawUser) {
+      const user = JSON.parse(rawUser);
+
+      learnerName =
+        user?.name || 'Qubify Learner';
+
+      if (
+        user?.tracked === true &&
+        user?.id
+      ) {
+        learnerId = user.id;
+      }
+    }
+
+    // --------------------------------------------------
+    // DELETE ALL DATA BELONGING TO THIS DEMO LEARNER
+    // --------------------------------------------------
+
+    if (learnerId) {
+      const prefix =
+        `qubify_${learnerId}_`;
+
+      const keysToDelete: string[] = [];
+
+      for (
+        let i = 0;
+        i < localStorage.length;
+        i++
+      ) {
+        const key =
+          localStorage.key(i);
+
+        if (
+          key &&
+          key.startsWith(prefix)
+        ) {
+          keysToDelete.push(key);
+        }
+      }
+
+      keysToDelete.forEach(
+        (key) =>
+          localStorage.removeItem(key)
+      );
+    }
+
+    // --------------------------------------------------
+    // DELETE OLD LEGACY / SHARED DATA
+    // --------------------------------------------------
+
+    const legacyKeys = [
+      'qubify_user_stats',
+      'qubify_beginner_nodes',
+      'qubify_intermediate_nodes',
+      'qubify_challenges',
+      'qubify_weekly_challenges',
+      'qubify_weekly_set_v2',
+      'qubify_weekly_history_v2',
+      'qubify_lab_run_history',
+    ];
+
+    legacyKeys.forEach(
+      (key) =>
+        localStorage.removeItem(key)
+    );
+  } catch {}
+
+  // --------------------------------------------------
+  // RESET REACT STATE TO TRUE BEGINNER STATE
+  // --------------------------------------------------
+
+  setUserStats({
+    ...INITIAL_USER_STATS,
+    name: learnerName,
+  });
+
+  setBeginnerNodes(
+    BEGINNER_NODES.map(
+      (node) => ({ ...node })
+    )
+  );
+
+  setIntermediateNodes(
+    INTERMEDIATE_NODES.map(
+      (node) => ({ ...node })
+    )
+  );
+
+  setChallenges(
+    CHALLENGE_LIST.map(
+      (challenge) => ({
+        ...challenge,
+      })
+    )
+  );
+
+  setSelectedLesson(
+    BEGINNER_NODES[0]
+  );
+
+  setCurrentView(
+    'dashboard'
+  );
+};
 
   // Navigation handler
   const handleNavigate = (view: AppView) => {
@@ -191,80 +708,149 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // Lesson completion handler
-  const handleCompleteLesson = (advanceToNext = false) => {
-    const nextNumber = Number(selectedLesson.number) + 1;
-    const nextNode = beginnerNodes.find((n) => Number(n.number) === nextNumber);
-
-    // Mark current lesson completed
-    if (selectedLesson.category === 'intermediate') {
-      setIntermediateNodes((prev) =>
-        prev.map((n) => {
-          if (n.id === selectedLesson.id) {
-            return { ...n, status: 'completed' };
-          }
-          if (selectedLesson.id === 'inter-1' && n.id === 'inter-2') {
-            return { ...n, status: 'current' };
-          }
-          if (selectedLesson.id === 'inter-2' && n.id === 'inter-3') {
-            return { ...n, status: 'current' };
-          }
-          if (selectedLesson.id === 'inter-3' && n.id === 'inter-4') {
-            return { ...n, status: 'current' };
-          }
-          if (selectedLesson.id === 'inter-4' && n.id === 'inter-5') {
-            return { ...n, status: 'current' };
-          }
-          if (selectedLesson.id === 'inter-5' && n.id === 'inter-6') {
-            return { ...n, status: 'current' };
-          }
-          if (selectedLesson.id === 'inter-6' && n.id === 'inter-7') {
-            return { ...n, status: 'upcoming' };
-          }
-          return n;
-        })
+const handleCompleteLesson = (
+  advanceToNext = false
+) => {
+  /*
+   * The curriculum itself now defines the real
+   * learning order.
+   *
+   * Advanced Quantum is intentionally excluded.
+   */
+  const curriculumOrder =
+    CURRICULUM_SECTIONS
+      .filter(
+        (section) => !section.isFuture
+      )
+      .flatMap(
+        (section) => section.nodeIds
       );
-    } else {
-      setBeginnerNodes((prev) =>
-        prev.map((n) => {
-          if (n.id === selectedLesson.id) {
-            return { ...n, status: 'completed' };
-          }
-          // Unlock next lesson if upcoming
-          if (n.number === nextNumber && n.status === 'upcoming') {
-            return { ...n, status: 'current' };
-          }
-          return n;
-        })
-      );
-    }
 
-    // Update user stats
-    setUserStats((prev) => {
-      const nextCompleted = Math.min(prev.totalLessons, prev.lessonsCompleted + 1);
-      return {
-        ...prev,
-        xp: prev.xp + 50,
-        lessonsCompleted: nextCompleted,
-        currentLessonId: nextNode ? nextNode.id : prev.currentLessonId,
-        currentLessonTitle: nextNode ? nextNode.title : prev.currentLessonTitle,
-        beginnerCompletionPercent: Math.min(
-          100,
-          Math.round((nextCompleted / prev.totalLessons) * 100)
-        ),
-      };
+  const currentIndex =
+    curriculumOrder.indexOf(
+      selectedLesson.id
+    );
+
+  const nextLessonId =
+    currentIndex >= 0 &&
+    currentIndex <
+      curriculumOrder.length - 1
+      ? curriculumOrder[
+          currentIndex + 1
+        ]
+      : null;
+
+  const allCurrentNodes = [
+    ...beginnerNodes,
+    ...intermediateNodes,
+  ];
+
+  const nextNode = nextLessonId
+    ? allCurrentNodes.find(
+        (node) =>
+          node.id === nextLessonId
+      )
+    : undefined;
+
+  /*
+   * Complete/unlock beginner nodes.
+   */
+  setBeginnerNodes((prev) =>
+    prev.map((node) => {
+      if (
+        node.id === selectedLesson.id
+      ) {
+        return {
+          ...node,
+          status: 'completed',
+        };
+      }
+
+      if (
+        nextLessonId &&
+        node.id === nextLessonId
+      ) {
+        return {
+          ...node,
+          status: 'current',
+        };
+      }
+
+      return node;
+    })
+  );
+
+  /*
+   * Complete/unlock intermediate nodes.
+   */
+  setIntermediateNodes((prev) =>
+    prev.map((node) => {
+      if (
+        node.id === selectedLesson.id
+      ) {
+        return {
+          ...node,
+          status: 'completed',
+        };
+      }
+
+      if (
+        nextLessonId &&
+        node.id === nextLessonId
+      ) {
+        return {
+          ...node,
+          status: 'current',
+        };
+      }
+
+      return node;
+    })
+  );
+
+  /*
+   * Basic learner statistics.
+   */
+  setUserStats((prev) => ({
+    ...prev,
+
+    xp: prev.xp + 50,
+
+    lessonsCompleted:
+      prev.lessonsCompleted + 1,
+
+    currentLessonId:
+      nextNode?.id ??
+      prev.currentLessonId,
+
+    currentLessonTitle:
+      nextNode?.title ??
+      prev.currentLessonTitle,
+  }));
+
+  /*
+   * Move directly into next lesson when
+   * lesson completion requests it.
+   */
+  if (
+    advanceToNext &&
+    nextNode
+  ) {
+    setSelectedLesson({
+      ...nextNode,
+      status: 'current',
     });
 
-    if (advanceToNext && nextNode) {
-      setSelectedLesson({ ...nextNode, status: 'current' });
-      setCurrentView('lesson');
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    } else {
-      // Return to path
-      setCurrentView('path');
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    }
-  };
+    setCurrentView('lesson');
+
+    window.scrollTo({
+      top: 0,
+      behavior: 'smooth',
+    });
+  } else {
+    setCurrentView('path');
+  }
+};
 
   // Challenge solved handler
   const handleSolveChallenge = (challengeId: string) => {
@@ -304,13 +890,16 @@ export default function App() {
         {/* =======================================================
             STAGE 1: BRANDED INTRO SCREEN (Plays ~2s on initial load)
             ======================================================= */}
-        {!hasSeenIntro ? (
-          <IntroScreen onComplete={handleIntroComplete} />
-        ) : !isAuthenticated ? (
+       {!hasSeenIntro ? (
+  <QubifyIntroView onComplete={handleIntroComplete} />
+) : !isAuthenticated ? (
           /* =====================================================
               STAGE 2: PROTOTYPE LOGIN SCREEN ("Welcome to Qubify")
               ===================================================== */
-          <PrototypeLoginScreen onLogin={handlePrototypeLogin} />
+          <PrototypeLoginScreen
+  onLogin={handlePrototypeLogin}
+  onGuest={handleGuestLogin}
+/>
         ) : (
           /* =====================================================
               STAGE 3: MAIN APP (Dashboard, Path, Lessons, Lab, etc.)
@@ -335,15 +924,24 @@ export default function App() {
                   handleNavigate('dashboard');
                 }}
               />
-            ) : currentView === 'lesson' ? (
-              /* Full-screen lesson views */
-              selectedLesson.id === 'lesson-1' || selectedLesson.title.toLowerCase() === 'bit' ? (
-                <BitLessonView
-                  onExit={() => handleNavigate('path')}
-                  onComplete={() => {
-                    handleCompleteLesson(true);
-                  }}
-                />
+ ) : currentView === 'lesson' ? (
+  /* Full-screen lesson views */
+  selectedLesson.id === 'lesson-0' ||
+  selectedLesson.title.toLowerCase() === 'classical vs quantum computing' ? (
+    <ClassicalVsQuantumLessonView
+      onExit={() => handleNavigate('path')}
+      onComplete={() => {
+        handleCompleteLesson(true);
+      }}
+    />
+  ) : selectedLesson.id === 'lesson-1' ||
+      selectedLesson.title.toLowerCase() === 'bit' ? (
+    <BitLessonView
+      onExit={() => handleNavigate('path')}
+      onComplete={() => {
+        handleCompleteLesson(true);
+      }}
+    />
               ) : selectedLesson.id === 'lesson-2' || selectedLesson.title.toLowerCase() === 'probability' ? (
                 <ProbabilityLessonView
                   onExit={() => handleNavigate('path')}
@@ -521,16 +1119,45 @@ export default function App() {
                 selectedLesson.id === 'rotation-gates' ||
                 selectedLesson.title.toLowerCase().includes('rotation') ? (
                 <RotationGatesLessonView
-                  onExit={() => handleNavigate('path')}
-                  onComplete={() => {
-                    handleCompleteLesson(false);
-                  }}
-                  onNextLesson={() => {
-                    handleNavigate('path');
-                  }}
-                />
-              ) : (
-                <LessonTemplateView
+  onExit={() => handleNavigate('path')}
+  onComplete={() => {
+    handleCompleteLesson(true);
+  }}
+/>
+              ) : selectedLesson.id === 'inter-7' ||
+  selectedLesson.title.toLowerCase().includes('multiple qubits') ? (
+  <MultipleQubitsLessonView
+    onExit={() => handleNavigate('path')}
+    onComplete={() => {
+      handleCompleteLesson(true);
+    }}
+  />
+) : selectedLesson.id === 'inter-8' ||
+  selectedLesson.title.toLowerCase().includes('cnot') ? (
+  <CNOTGateLessonView
+    onExit={() => handleNavigate('path')}
+    onComplete={() => {
+      handleCompleteLesson(true);
+    }}
+  />
+) : selectedLesson.id === 'inter-9' ||
+  selectedLesson.title.toLowerCase().includes('entanglement') ? (
+  <EntanglementLessonView
+    onExit={() => handleNavigate('path')}
+    onComplete={() => {
+      handleCompleteLesson(true);
+    }}
+  />
+) : selectedLesson.id === 'inter-10' ||
+  selectedLesson.title.toLowerCase().includes('bell state') ? (
+  <BellStateLessonView
+    onExit={() => handleNavigate('path')}
+    onComplete={() => {
+      handleCompleteLesson(false);
+    }}
+  />
+) : (
+  <LessonTemplateView
                   currentLesson={selectedLesson}
                   allLessons={beginnerNodes}
                   onSelectLesson={handleSelectLesson}
@@ -582,11 +1209,13 @@ export default function App() {
 
                 {currentView === 'progress' && (
                   <ProgressView
-                    userStats={userStats}
-                    onNavigateToPath={() => handleNavigate('path')}
-                    onNavigateToLab={() => handleNavigate('lab')}
-                    onNavigateToChallenges={() => handleNavigate('challenges')}
-                  />
+  userStats={userStats}
+  beginnerNodes={beginnerNodes}
+  intermediateNodes={intermediateNodes}
+  onNavigateToPath={() => handleNavigate('path')}
+  onNavigateToLab={() => handleNavigate('lab')}
+  onNavigateToChallenges={() => handleNavigate('challenges')}
+/>
                 )}
 
                 {/* Floating AI Help Assistant: "Ask Qubify AI" */}
@@ -600,16 +1229,18 @@ export default function App() {
                   }
                 />
 
-                {/* User Profile & Preferences Modal */}
-                <ProfileModal
-                  isOpen={isProfileOpen}
-                  onClose={() => setIsProfileOpen(false)}
-                  userStats={userStats}
-                  onLogout={handleLogout}
-                  onResetProgress={handleResetProgress}
-                />
+               
               </AppShell>
             )}
+            {/* Global Profile Modal */}
+            <ProfileModal
+              isOpen={isProfileOpen}
+              onClose={() => setIsProfileOpen(false)}
+              userStats={userStats}
+              onLogout={handleLogout}
+              onResetProgress={handleResetProgress}
+            />
+
           </>
         )}
 

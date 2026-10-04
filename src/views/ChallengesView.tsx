@@ -1,3 +1,6 @@
+import { CHALLENGE_BANK } from '../data/challengeBank';
+import { DailyChallengePanel } from '../components/challenges/DailyChallengePanel';
+import { LearningInsightsPanel } from '../components/challenges/LearningInsightsPanel';
 import React, { useState, useEffect } from 'react';
 import { 
   Trophy, 
@@ -47,6 +50,32 @@ export const ChallengesView: React.FC<ChallengesViewProps> = ({
     beginnerNodes,
     intermediateNodes
   );
+  const learnedChallengePool =
+  CHALLENGE_BANK.filter(
+    (challenge) => {
+      const mainLearned =
+        completedIds.includes(
+          challenge.requiredLesson
+        );
+
+      const secondaryLearned =
+        !challenge.secondaryLesson ||
+        completedIds.includes(
+          challenge.secondaryLesson
+        );
+
+      return (
+        mainLearned &&
+        secondaryLearned
+      );
+    }
+  );
+
+const canStartDaily =
+  learnedChallengePool.length >= 3;
+  const canStartWeekly =
+  learnedChallengePool.length >= 7;
+  
 
   // Weekly challenge state
   const [weeklySet, setWeeklySet] = useState<WeeklyChallengeSet>(() => {
@@ -154,6 +183,37 @@ export const ChallengesView: React.FC<ChallengesViewProps> = ({
 
   return (
     <div className="w-full max-w-4xl mx-auto space-y-6 text-left pb-12">
+    {canStartDaily ? (
+  <>
+    <DailyChallengePanel
+      beginnerNodes={beginnerNodes}
+      intermediateNodes={intermediateNodes}
+    />
+
+    <LearningInsightsPanel />
+  </>
+) : (
+  <div className="rounded-xl border border-[#44474A] bg-[#28292A] p-6">
+    <div className="text-xs font-bold uppercase tracking-wider text-[#1FA7DA]">
+      Daily Challenge
+    </div>
+
+    <h2 className="mt-2 text-xl font-bold text-[#F1F1F1]">
+      Keep learning to unlock practice
+    </h2>
+
+    <p className="mt-2 text-sm text-[#B7BABD]">
+      Qubify only creates challenge questions
+      from lessons you have already completed.
+    </p>
+
+    <p className="mt-3 text-xs text-[#858A8E]">
+      Complete a few lessons first. Your Daily
+      Challenge will unlock automatically when
+      enough practice questions are available.
+    </p>
+  </div>
+)}
       
       {/* 1. HEADER: Flat panel with progress and countdown */}
       <div className="bg-[#2B2C2D] border border-[#44474A] rounded-xl p-5 sm:p-6 flex flex-col md:flex-row md:items-center md:justify-between gap-5">
@@ -207,149 +267,36 @@ export const ChallengesView: React.FC<ChallengesViewProps> = ({
           ))}
         </div>
       </div>
+{!canStartWeekly && (
+  <div className="rounded-xl border border-[#44474A] bg-[#28292A] p-6">
+    <div className="text-xs font-bold uppercase tracking-wider text-purple-300">
+      Weekly Challenge
+    </div>
 
-      {/* 3. MAIN CHALLENGES LIST: Flat Rows */}
-      <div className="space-y-3">
-        <div className="flex items-center justify-between px-1">
-          <h2 className="text-xs font-bold uppercase tracking-wider text-[#858A8E] flex items-center gap-2">
-            <Layers className="w-3.5 h-3.5 text-[#1FA7DA]" />
-            <span>Challenge Set ({completedCount} of 7 Solved)</span>
-          </h2>
+    <h2 className="mt-2 text-xl font-bold text-[#F1F1F1]">
+      Weekly practice is locked
+    </h2>
 
-          <button
-            onClick={() => setShowHistory(!showHistory)}
-            className="text-xs font-semibold text-[#858A8E] hover:text-[#F1F1F1] flex items-center gap-1.5 cursor-pointer transition-colors"
-          >
-            <History className="w-3.5 h-3.5" />
-            <span>{showHistory ? 'Hide Archive' : 'Previous Weeks'}</span>
-          </button>
-        </div>
+    <p className="mt-2 text-sm text-[#B7BABD]">
+      Qubify will not test you on topics you have not learned yet.
+    </p>
 
-        {/* Flat Rows */}
-        <div className="space-y-2">
-          {weeklySet.challenges.map((challenge) => {
-            const isCompleted = challenge.status === 'completed';
-            const isInProgress = challenge.status === 'in_progress';
+    <p className="mt-3 text-xs text-[#858A8E]">
+      Complete more lessons first. Once at least 7 suitable practice
+      questions are available from completed lessons, your Weekly
+      Challenge will unlock automatically.
+    </p>
 
-            return (
-              <div
-                key={challenge.id}
-                onClick={() => handleOpenChallenge(challenge, isCompleted)}
-                className={`p-3.5 sm:p-4 rounded-lg border transition-colors cursor-pointer flex items-center justify-between gap-4 ${
-                  challenge.isFinalChallenge
-                    ? isCompleted
-                      ? 'bg-[#2B2C2D] border-[#44474A]'
-                      : 'bg-[#2B2C2D] border-purple-500/40 hover:border-purple-400'
-                    : isCompleted
-                    ? 'bg-[#28292A] border-[#44474A]/80'
-                    : 'bg-[#2B2C2D] border-[#44474A] hover:border-[#858A8E]'
-                }`}
-              >
-                {/* Left: Challenge Number & Topic */}
-                <div className="flex items-center gap-3">
-                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-mono font-bold text-xs shrink-0 ${
-                    isCompleted
-                      ? 'bg-[#1C3325] text-emerald-400 border border-emerald-500/50'
-                      : challenge.isFinalChallenge
-                      ? 'bg-purple-950/60 text-purple-300 border border-purple-500/40'
-                      : 'bg-[#28292A] text-[#1FA7DA] border border-[#44474A]'
-                  }`}>
-                    {isCompleted ? <CheckCircle2 className="w-4 h-4" /> : String(challenge.orderNumber).padStart(2, '0')}
-                  </div>
+    <div className="mt-4 text-xs font-mono text-[#1FA7DA]">
+      {learnedChallengePool.length} / 7 practice questions available
+    </div>
+  </div>
+)}
 
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-semibold text-[#F1F1F1]">
-                        {challenge.topic}
-                      </span>
-                      {challenge.isFinalChallenge && (
-                        <span className="px-1.5 py-0.2 rounded text-[10px] font-bold uppercase tracking-wider bg-purple-950/60 text-purple-300 border border-purple-500/40">
-                          Weekly Final
-                        </span>
-                      )}
-                    </div>
-                    <div className="text-xs text-[#858A8E] mt-0.5 line-clamp-1">
-                      {challenge.question}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Right: Difficulty, Status & Action Button */}
-                <div className="flex items-center gap-3 shrink-0">
-                  <div className="hidden sm:block">
-                    {difficultyBadge(challenge.difficulty)}
-                  </div>
-
-                  <div className="text-right">
-                    {isCompleted ? (
-                      <span className="inline-flex items-center px-3 py-1 rounded-md bg-[#28292A] text-emerald-400 border border-emerald-500/30 text-xs font-medium">
-                        Completed
-                      </span>
-                    ) : isInProgress ? (
-                      <button
-                        className="px-3 py-1 rounded-md bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 text-xs font-semibold border border-amber-500/30 transition-colors cursor-pointer"
-                      >
-                        Continue
-                      </button>
-                    ) : (
-                      <button
-                        className="px-3.5 py-1 rounded-md bg-[#1FA7DA] hover:bg-[#27B4E8] text-white text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1"
-                      >
-                        <span>Start</span>
-                        <ArrowRight className="w-3 h-3" />
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
+{canStartWeekly && (
+  <div className="contents">
       </div>
-
-      {/* 4. PREVIOUS WEEKS / CHALLENGE HISTORY */}
-      {showHistory && (
-        <div className="p-4 bg-[#28292A] border border-[#44474A] rounded-xl space-y-3 animate-in fade-in">
-          <div className="flex items-center justify-between pb-2 border-b border-[#44474A]">
-            <div className="flex items-center gap-2">
-              <History className="w-4 h-4 text-[#1FA7DA]" />
-              <h3 className="text-sm font-semibold text-[#F1F1F1]">Past Weeks Archive</h3>
-            </div>
-            <span className="text-xs text-[#858A8E]">Archived sets</span>
-          </div>
-
-          {history.length === 0 ? (
-            <div className="py-6 text-center text-xs text-[#858A8E]">
-              No archived weeks yet. Completed sets from previous weeks will appear here.
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-              {history.map((record) => (
-                <div 
-                  key={record.weekId}
-                  className="p-3 bg-[#2B2C2D] border border-[#44474A] rounded-lg flex items-center justify-between"
-                >
-                  <div>
-                    <div className="text-xs font-semibold text-[#F1F1F1]">{record.weekLabel}</div>
-                    <div className="text-[11px] text-[#858A8E] font-mono">Archived {record.completedDate}</div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-mono text-emerald-400 font-semibold">
-                      {record.completedCount} / {record.totalCount}
-                    </span>
-                    <button
-                      onClick={() => handleOpenChallenge(record.challenges[0], true)}
-                      className="px-2.5 py-1 text-[11px] bg-[#28292A] hover:bg-[#303234] text-[#B7BABD] rounded-md border border-[#44474A] cursor-pointer transition-colors"
-                    >
-                      Inspect
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
+)}
 
       {/* Interactive Challenge Player Modal */}
       <WeeklyChallengeModal

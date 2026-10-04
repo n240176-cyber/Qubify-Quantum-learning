@@ -244,7 +244,7 @@ export const QiskitSummaryScreen: React.FC<QiskitSummaryScreenProps> = ({
             You have mastered Bits, Probabilities, Qubits, Gates, Circuits, Shots, and Qiskit.
           </p>
           <p className="text-xs sm:text-sm font-semibold text-white">
-            “Ready to put your knowledge to the test in the Beginner Capstone Challenge?”
+            “Ready to continue into multi-qubit quantum systems?”
           </p>
         </div>
 
@@ -268,7 +268,7 @@ export const QiskitSummaryScreen: React.FC<QiskitSummaryScreenProps> = ({
             onClick={onNextLesson}
             className="flex-1 w-full py-3.5 px-6 rounded-full bg-gradient-to-r from-[#4F7CFF] to-[#6366F1] hover:from-[#3d6bf0] hover:to-[#5558e6] text-white font-bold text-sm flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-[#4F7CFF]/20 active:scale-[0.99] transition-all"
           >
-            <span>START BEGINNER CHALLENGE</span>
+           <span>NEXT: MULTIPLE QUBITS</span>
             <ArrowRight className="w-4 h-4" />
           </button>
 

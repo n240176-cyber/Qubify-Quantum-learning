@@ -6,9 +6,86 @@ import {
   LearningNodeItem 
 } from '../types';
 import { CHALLENGE_BANK } from '../data/challengeBank';
+import { getWeakTopics } from './topicPerformance';
 
-const STORAGE_CURRENT_WEEK_KEY = 'qubify_weekly_set_v2';
-const STORAGE_HISTORY_KEY = 'qubify_weekly_history_v2';
+const getCurrentLearnerId = (): string | null => {
+  try {
+    const rawUser = localStorage.getItem(
+      'qubify_prototype_user'
+    );
+
+    if (!rawUser) return null;
+
+    const user = JSON.parse(rawUser);
+
+    if (
+      user?.tracked === true &&
+      user?.id
+    ) {
+      return user.id;
+    }
+  } catch {}
+
+  return null;
+};
+
+const getCurrentWeekStorageKey = () => {
+  const learnerId =
+    getCurrentLearnerId();
+
+  return learnerId
+    ? `qubify_${learnerId}_weekly_set_v2`
+    : 'qubify_guest_weekly_set_v2';
+};
+
+const getHistoryStorageKey = () => {
+  const learnerId =
+    getCurrentLearnerId();
+
+  return learnerId
+    ? `qubify_${learnerId}_weekly_history_v2`
+    : 'qubify_guest_weekly_history_v2';
+};
+
+const readChallengeStorage = (
+  key: string
+): string | null => {
+  const learnerId =
+    getCurrentLearnerId();
+
+  try {
+    if (learnerId) {
+      return localStorage.getItem(key);
+    }
+
+    // Guest challenge data survives only this browser tab/session.
+    return sessionStorage.getItem(key);
+  } catch {
+    return null;
+  }
+};
+
+const writeChallengeStorage = (
+  key: string,
+  value: string
+) => {
+  const learnerId =
+    getCurrentLearnerId();
+
+  try {
+    if (learnerId) {
+      localStorage.setItem(
+        key,
+        value
+      );
+    } else {
+      sessionStorage.setItem(
+        key,
+        value
+      );
+    }
+  } catch {}
+};
 
 /**
  * Returns ISO week string, e.g. "2026-W39"
@@ -96,51 +173,159 @@ export function generateWeeklyChallengeSet(
   // Shuffle pool with deterministic RNG
   const shuffled = [...pool].sort(() => rng() - 0.5);
 
-  const selected: BankChallenge[] = [];
-  const usedIds = new Set<string>();
+ const selected: BankChallenge[] = [];
+const usedIds = new Set<string>();
 
-  // Slot 1: Review an older completed topic (if any completed)
-  const reviewPool = shuffled.filter((c) => completedLessonIds.includes(c.requiredLesson) && !usedIds.has(c.id));
-  const challenge1 = reviewPool[0] || shuffled[0];
-  selected.push(challenge1);
-  usedIds.add(challenge1.id);
+// ---------------------------------------------------------
+// ADAPTIVE WEEKLY SELECTION
+// ---------------------------------------------------------
 
-  // Slot 7: Weekly Final Challenge (Combines 2+ concepts or highest difficulty)
-  const finalPool = shuffled.filter((c) => c.isFinalChallenge && !usedIds.has(c.id));
-  const challenge7 = finalPool[0] || shuffled.find((c) => c.difficulty === 'challenge' && !usedIds.has(c.id)) || shuffled.find((c) => !usedIds.has(c.id)) || pool[0];
-  usedIds.add(challenge7.id);
+const weakTopics = getWeakTopics(2).map(
+  (item) => item.topic
+);
 
-  // Slots 2 to 6: Balanced mix of concept reasoning, predictions, bloch sphere, circuit interpretation
-  const targetTypes: (BankChallenge['type'] | undefined)[] = [
-    undefined, // Slot 2: current topic
-    undefined, // Slot 3: current topic
-    'fix_statement', // Slot 4: concept reasoning
-    'prediction', // Slot 5: visual / prediction
-    'circuit_interpretation', // Slot 6: mixed concept
-  ];
+// Slot 1 + Slot 2:
+// Prefer the learner's weakest topics.
+for (const weakTopic of weakTopics) {
+  const candidate = shuffled.find(
+    (challenge) =>
+      challenge.topic === weakTopic &&
+      !usedIds.has(challenge.id)
+  );
 
-  for (let i = 0; i < targetTypes.length; i++) {
-    const targetType = targetTypes[i];
-    let candidate: BankChallenge | undefined;
-
-    if (targetType) {
-      candidate = shuffled.find((c) => c.type === targetType && !usedIds.has(c.id));
-    }
-    if (!candidate) {
-      candidate = shuffled.find((c) => !usedIds.has(c.id));
-    }
-    if (!candidate) {
-      // If pool is small, reuse another with fallback
-      candidate = pool[i % pool.length];
-    }
-
+  if (candidate) {
     selected.push(candidate);
     usedIds.add(candidate.id);
   }
 
-  // Insert challenge7 at the end (slot 7)
-  selected.push(challenge7);
+  if (selected.length >= 2) {
+    break;
+  }
+}
 
+// If we do not have enough weak-topic history yet,
+// use completed lessons for review.
+while (selected.length < 2) {
+  const reviewCandidate = shuffled.find(
+    (challenge) =>
+      completedLessonIds.includes(
+        challenge.requiredLesson
+      ) &&
+      !usedIds.has(challenge.id)
+  );
+
+  const fallbackCandidate =
+    shuffled.find(
+      (challenge) =>
+        !usedIds.has(challenge.id)
+    );
+
+  const candidate =
+    reviewCandidate ||
+    fallbackCandidate;
+
+  if (!candidate) {
+    break;
+  }
+
+  selected.push(candidate);
+  usedIds.add(candidate.id);
+}
+
+// ---------------------------------------------------------
+// Slots 3–6:
+// Balanced question types
+// ---------------------------------------------------------
+
+const targetTypes: (
+  | BankChallenge['type']
+  | undefined
+)[] = [
+  undefined,
+  'fix_statement',
+  'prediction',
+  'circuit_interpretation',
+];
+
+for (
+  let i = 0;
+  i < targetTypes.length;
+  i++
+) {
+  const targetType =
+    targetTypes[i];
+
+  let candidate:
+    | BankChallenge
+    | undefined;
+
+  if (targetType) {
+    candidate = shuffled.find(
+      (challenge) =>
+        challenge.type ===
+          targetType &&
+        !usedIds.has(
+          challenge.id
+        )
+    );
+  }
+
+  if (!candidate) {
+    candidate = shuffled.find(
+      (challenge) =>
+        !usedIds.has(
+          challenge.id
+        )
+    );
+  }
+
+  if (!candidate) {
+    candidate =
+      pool[i % pool.length];
+  }
+
+  if (candidate) {
+    selected.push(candidate);
+    usedIds.add(candidate.id);
+  }
+}
+
+// ---------------------------------------------------------
+// Slot 7:
+// Weekly Final
+// ---------------------------------------------------------
+
+const finalPool =
+  shuffled.filter(
+    (challenge) =>
+      challenge.isFinalChallenge &&
+      !usedIds.has(
+        challenge.id
+      )
+  );
+
+const challenge7 =
+  finalPool[0] ||
+  shuffled.find(
+    (challenge) =>
+      challenge.difficulty ===
+        'challenge' &&
+      !usedIds.has(
+        challenge.id
+      )
+  ) ||
+  shuffled.find(
+    (challenge) =>
+      !usedIds.has(
+        challenge.id
+      )
+  ) ||
+  pool[0];
+
+if (challenge7) {
+  selected.push(challenge7);
+  usedIds.add(challenge7.id);
+}
   // Transform into ActiveWeeklyChallenge
   const activeChallenges: ActiveWeeklyChallenge[] = selected.map((c, index) => ({
     ...c,
@@ -176,7 +361,10 @@ export function loadOrInitWeeklyChallenges(
 
   // Load history
   try {
-    const rawHistory = localStorage.getItem(STORAGE_HISTORY_KEY);
+   const rawHistory =
+  readChallengeStorage(
+    getHistoryStorageKey()
+  );
     if (rawHistory) {
       history = JSON.parse(rawHistory);
     }
@@ -186,7 +374,10 @@ export function loadOrInitWeeklyChallenges(
 
   // Load saved current week
   try {
-    const rawCurrent = localStorage.getItem(STORAGE_CURRENT_WEEK_KEY);
+   const rawCurrent =
+  readChallengeStorage(
+    getCurrentWeekStorageKey()
+  );
     if (rawCurrent) {
       const parsed: WeeklyChallengeSet = JSON.parse(rawCurrent);
       // If same week, retain user progress
@@ -207,7 +398,10 @@ export function loadOrInitWeeklyChallenges(
           challenges: parsed.challenges,
         };
         history = [archiveRecord, ...history.slice(0, 11)];
-        localStorage.setItem(STORAGE_HISTORY_KEY, JSON.stringify(history));
+       writeChallengeStorage(
+  getHistoryStorageKey(),
+  JSON.stringify(history)
+);
       }
     }
   } catch (e) {
@@ -226,14 +420,14 @@ export function loadOrInitWeeklyChallenges(
 /**
  * Saves the weekly challenge set to localStorage
  */
-export function saveWeeklyChallengeSet(set: WeeklyChallengeSet): void {
-  try {
-    localStorage.setItem(STORAGE_CURRENT_WEEK_KEY, JSON.stringify(set));
-  } catch (e) {
-    // ignore quota errors
-  }
+export function saveWeeklyChallengeSet(
+  set: WeeklyChallengeSet
+): void {
+  writeChallengeStorage(
+    getCurrentWeekStorageKey(),
+    JSON.stringify(set)
+  );
 }
-
 /**
  * Updates a challenge's status (e.g. when solved or attempted)
  */

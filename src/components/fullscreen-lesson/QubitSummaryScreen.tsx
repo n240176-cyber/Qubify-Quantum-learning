@@ -259,14 +259,14 @@ export const QubitSummaryScreen: React.FC<QubitSummaryScreenProps> = ({
             </button>
           )}
 
-          {/* Primary Action Button: NEXT: QUANTUM GATES */}
+          {/* Primary Action Button: NEXT: BLOCH SPHERE */}
           <button
             id="qubit-next-lesson-btn"
             type="button"
             onClick={onNextLesson}
             className="w-full sm:flex-1 group inline-flex items-center justify-center gap-2.5 px-6 py-3.5 rounded-full text-sm font-bold tracking-wide transition-all duration-200 cursor-pointer bg-gradient-to-r from-[#4F7CFF] to-[#6366F1] hover:from-[#3d6bf0] hover:to-[#5558e6] text-white shadow-lg shadow-[#4F7CFF]/25 ring-1 ring-[#22D3EE]/30 active:scale-[0.98]"
           >
-            <span>NEXT: QUANTUM GATES</span>
+            <span>NEXT: BLOCH SPHERE</span>
             <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
           </button>
 

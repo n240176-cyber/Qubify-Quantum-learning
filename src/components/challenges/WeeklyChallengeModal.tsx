@@ -8,6 +8,9 @@ import {
 } from 'lucide-react';
 import { ActiveWeeklyChallenge } from '../../types';
 
+import {
+  recordTopicAttempt,
+} from '../../utils/topicPerformance';
 interface WeeklyChallengeModalProps {
   isOpen: boolean;
   challenge: ActiveWeeklyChallenge | null;
@@ -42,19 +45,43 @@ export const WeeklyChallengeModal: React.FC<WeeklyChallengeModalProps> = ({
   }, [challenge, isReadOnly]);
 
   const handleCheckAnswer = () => {
-    if (!selectedOptionId || isReadOnly) return;
+  if (
+    !selectedOptionId ||
+    isReadOnly
+  ) {
+    return;
+  }
 
-    const isCorrect = selectedOptionId === challenge.correctAnswer;
-    const newAttempts = attempts + 1;
-    setAttempts(newAttempts);
+  const isCorrect =
+    selectedOptionId ===
+    challenge.correctAnswer;
 
-    if (isCorrect) {
-      setSubmissionState('correct');
-      onCompleteChallenge(challenge.id);
-    } else {
-      setSubmissionState('wrong');
-    }
-  };
+  const newAttempts =
+    attempts + 1;
+
+  setAttempts(newAttempts);
+
+  // Track this attempt by topic.
+  // Guest users are automatically ignored.
+  recordTopicAttempt(
+    challenge.topic,
+    isCorrect
+  );
+
+  if (isCorrect) {
+    setSubmissionState(
+      'correct'
+    );
+
+    onCompleteChallenge(
+      challenge.id
+    );
+  } else {
+    setSubmissionState(
+      'wrong'
+    );
+  }
+};
 
   const handleRetry = () => {
     setSubmissionState('idle');

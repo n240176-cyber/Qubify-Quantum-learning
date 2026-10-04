@@ -1252,7 +1252,7 @@ export const RotationGatesLessonView: React.FC<RotationGatesLessonViewProps> = (
                     className="w-full py-3.5 rounded-xl bg-gradient-to-r from-[#38BDF8] to-[#0284C7] text-white font-mono font-bold text-sm hover:opacity-95 transition shadow-xl flex items-center justify-center gap-2"
                   >
                     <Award className="w-4 h-4" />
-                    NEXT: MULTIPLE QUBITS
+                    NEXT: QUANTUM CIRCUITS
                   </button>
                 </div>
               )}

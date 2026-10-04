@@ -1,5 +1,14 @@
 import React from 'react';
-import { UserStats } from '../types';
+import {
+  LearningNodeItem,
+  UserStats,
+} from '../types';
+
+import { CHALLENGE_BANK } from '../data/challengeBank';
+
+import {
+  getTopicPerformance,
+} from '../utils/topicPerformance';
 import { ProgressBar } from '../components/common/ProgressBar';
 import { 
   BarChart3, 
@@ -14,6 +23,10 @@ import {
 
 interface ProgressViewProps {
   userStats: UserStats;
+
+  beginnerNodes: LearningNodeItem[];
+  intermediateNodes: LearningNodeItem[];
+
   onNavigateToPath: () => void;
   onNavigateToLab: () => void;
   onNavigateToChallenges: () => void;
@@ -21,24 +34,124 @@ interface ProgressViewProps {
 
 export const ProgressView: React.FC<ProgressViewProps> = ({
   userStats,
+  beginnerNodes,
+  intermediateNodes,
   onNavigateToPath,
   onNavigateToLab,
   onNavigateToChallenges,
 }) => {
   // Topic mastery list matching the requirements:
   // Bits, Probability, Qubits, Measurement, Gates, Circuits, Shots, Qiskit, Bloch Sphere
-  const topicMasteryList = [
-    { name: 'Bits', percent: userStats.lessonsCompleted >= 1 ? 100 : 0, status: userStats.lessonsCompleted >= 1 ? 'Mastered' : 'Locked' },
-    { name: 'Probability', percent: userStats.lessonsCompleted >= 2 ? 100 : userStats.lessonsCompleted >= 1 ? 40 : 0, status: userStats.lessonsCompleted >= 2 ? 'Mastered' : userStats.lessonsCompleted >= 1 ? 'In Progress' : 'Locked' },
-    { name: 'Qubits', percent: userStats.lessonsCompleted >= 3 ? 100 : userStats.lessonsCompleted >= 2 ? 30 : 0, status: userStats.lessonsCompleted >= 3 ? 'Mastered' : userStats.lessonsCompleted >= 2 ? 'In Progress' : 'Locked' },
-    { name: 'Measurement', percent: userStats.lessonsCompleted >= 4 ? 100 : userStats.lessonsCompleted >= 3 ? 20 : 0, status: userStats.lessonsCompleted >= 4 ? 'Mastered' : userStats.lessonsCompleted >= 3 ? 'In Progress' : 'Locked' },
-    { name: 'Gates', percent: userStats.lessonsCompleted >= 5 ? 100 : userStats.lessonsCompleted >= 4 ? 25 : 0, status: userStats.lessonsCompleted >= 5 ? 'Mastered' : userStats.lessonsCompleted >= 4 ? 'In Progress' : 'Locked' },
-    { name: 'Circuits', percent: userStats.lessonsCompleted >= 6 ? 100 : userStats.lessonsCompleted >= 5 ? 20 : 0, status: userStats.lessonsCompleted >= 6 ? 'Mastered' : userStats.lessonsCompleted >= 5 ? 'In Progress' : 'Locked' },
-    { name: 'Shots', percent: userStats.lessonsCompleted >= 7 ? 100 : userStats.lessonsCompleted >= 6 ? 30 : 0, status: userStats.lessonsCompleted >= 7 ? 'Mastered' : userStats.lessonsCompleted >= 6 ? 'In Progress' : 'Locked' },
-    { name: 'Qiskit', percent: userStats.lessonsCompleted >= 8 ? 100 : userStats.lessonsCompleted >= 7 ? 35 : 0, status: userStats.lessonsCompleted >= 8 ? 'Mastered' : userStats.lessonsCompleted >= 7 ? 'In Progress' : 'Locked' },
-    { name: 'Bloch Sphere', percent: userStats.lessonsCompleted >= 9 ? 60 : 0, status: userStats.lessonsCompleted >= 9 ? 'In Progress' : 'Locked' },
-  ];
+ 
+const allNodes = [
+  ...beginnerNodes,
+  ...intermediateNodes,
+];
 
+const completedLessonIds =
+  new Set(
+    allNodes
+      .filter(
+        (node) =>
+          node.status === 'completed'
+      )
+      .map(
+        (node) => node.id
+      )
+  );
+
+const performanceByTopic =
+  getTopicPerformance();
+
+// Automatically use the real topics
+// available in the Qubify challenge bank.
+const trackedTopics =
+  Array.from(
+    new Set(
+      CHALLENGE_BANK.map(
+        (challenge) =>
+          challenge.topic
+      )
+    )
+  );
+
+const topicMasteryList =
+  trackedTopics.map(
+    (topicName) => {
+      const topicQuestions =
+        CHALLENGE_BANK.filter(
+          (challenge) =>
+            challenge.topic ===
+            topicName
+        );
+
+      // A topic only unlocks when at least
+      // one question belongs to lessons that
+      // the learner has actually completed.
+      const unlocked =
+        topicQuestions.some(
+          (challenge) => {
+            const mainCompleted =
+              completedLessonIds.has(
+                challenge.requiredLesson
+              );
+
+            const secondaryCompleted =
+              !challenge.secondaryLesson ||
+              completedLessonIds.has(
+                challenge.secondaryLesson
+              );
+
+            return (
+              mainCompleted &&
+              secondaryCompleted
+            );
+          }
+        );
+
+      const performance =
+        performanceByTopic[
+          topicName
+        ];
+
+      const attempts =
+        performance?.attempts ?? 0;
+
+      const percent =
+        unlocked
+          ? performance?.masteryScore ??
+            0
+          : 0;
+
+      let status =
+        'Locked';
+
+      if (unlocked) {
+        if (attempts === 0) {
+          status =
+            'Ready to Practice';
+        } else if (attempts < 2) {
+          status =
+            'Building Evidence';
+        } else if (percent >= 80) {
+          status = 'Strong';
+        } else if (percent >= 60) {
+          status = 'Improving';
+        } else {
+          status =
+            'Needs Review';
+        }
+      }
+
+      return {
+        name: topicName,
+        percent,
+        status,
+        attempts,
+        unlocked,
+      };
+    }
+  );
   return (
     <div className="w-full max-w-4xl mx-auto space-y-6 text-left pb-12">
       
@@ -150,7 +263,13 @@ export const ProgressView: React.FC<ProgressViewProps> = ({
             </p>
           </div>
           <span className="text-xs font-mono text-[#1FA7DA]">
-            {topicMasteryList.filter(t => t.percent === 100).length} of {topicMasteryList.length} Mastered
+           {topicMasteryList.filter(
+  (topic) =>
+    topic.status === 'Strong'
+).length}{' '}
+of{' '}
+{topicMasteryList.length}{' '}
+Strong
           </span>
         </div>
 
@@ -164,21 +283,36 @@ export const ProgressView: React.FC<ProgressViewProps> = ({
               <div className="flex items-center justify-between">
                 <span className="text-xs font-semibold text-[#F1F1F1]">{topic.name}</span>
                 <span className={`text-[10px] font-mono px-1.5 py-0.2 rounded border ${
-                  topic.percent === 100
-                    ? 'text-emerald-400 bg-emerald-950/40 border-emerald-500/30'
-                    : topic.percent > 0
-                    ? 'text-[#1FA7DA] bg-[#1E3545] border-[#1FA7DA]/30'
-                    : 'text-[#858A8E] bg-[#202122] border-[#44474A]'
+                 topic.status === 'Strong'
+  ? 'text-emerald-400 bg-emerald-950/40 border-emerald-500/30'
+  : topic.unlocked
+  ? 'text-[#1FA7DA] bg-[#1E3545] border-[#1FA7DA]/30'
+  : 'text-[#858A8E] bg-[#202122] border-[#44474A]'
                 }`}>
                   {topic.status}
                 </span>
               </div>
 
-              <ProgressBar value={topic.percent} size="sm" color={topic.percent === 100 ? 'success' : 'cyan'} showPercent={false} />
+             <ProgressBar
+  value={topic.percent}
+  size="sm"
+  color={
+    topic.status === 'Strong'
+      ? 'success'
+      : 'cyan'
+  }
+  showPercent={false}
+/>
 
               <div className="flex items-center justify-between text-[11px] text-[#858A8E] font-mono">
                 <span>Mastery</span>
-                <span>{topic.percent}%</span>
+                <span>
+  {topic.unlocked
+    ? topic.attempts > 0
+      ? `${topic.percent}%`
+      : 'Not assessed'
+    : '—'}
+</span>
               </div>
             </div>
           ))}

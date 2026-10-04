@@ -1,28 +1,44 @@
 import { LearningNodeItem, LessonStepConfig, ChallengeItem, UserStats } from '../types';
 
 export const INITIAL_USER_STATS: UserStats = {
-  name: 'Alex Rivera',
+  name: 'Qubify Learner',
   level: 'Level 1',
   levelTitle: 'Quantum Initiate',
-  currentLessonId: 'lesson-1',
-  currentLessonTitle: 'Bit',
-  streakDays: 4,
-  xp: 120,
-  beginnerCompletionPercent: 11,
+
+  currentLessonId: 'lesson-0',
+  currentLessonTitle: 'Classical vs Quantum Computing',
+
+  streakDays: 0,
+  xp: 0,
+
+  beginnerCompletionPercent: 0,
+
   lessonsCompleted: 0,
-  totalLessons: 9,
+  totalLessons: 17,
+
   challengesCompleted: 0,
   totalChallenges: 7,
-  labExperimentsCompleted: 2,
+
+  labExperimentsCompleted: 0,
 };
 
 export const BEGINNER_NODES: LearningNodeItem[] = [
   {
+  id: 'lesson-0',
+  number: 1,
+  title: 'Classical vs Quantum Computing',
+  subtitle: 'Understand how classical and quantum computers differ',
+  status: 'current',
+  category: 'beginner',
+  xp: 20,
+  estimatedMinutes: 6,
+},
+  {
     id: 'lesson-1',
-    number: 1,
+    number: 2,
     title: 'Bit',
     subtitle: 'Classical 0 and 1 foundations',
-    status: 'current',
+    status: 'upcoming',
     category: 'beginner',
     xp: 20,
     estimatedMinutes: 4,
@@ -147,7 +163,7 @@ export const INTERMEDIATE_NODES: LearningNodeItem[] = [
     number: 'Int 4',
     title: 'Y Gate',
     subtitle: 'Phase rotation and complex dynamics',
-    status: 'completed',
+    status: 'upcoming',
     category: 'intermediate',
     xp: 60,
     estimatedMinutes: 8,
@@ -158,7 +174,7 @@ export const INTERMEDIATE_NODES: LearningNodeItem[] = [
     number: 'Int 5',
     title: 'Single-Qubit Gate Comparison',
     subtitle: 'Geometric rotation sticks: X vs Y vs Z',
-    status: 'completed',
+    status: 'upcoming',
     category: 'intermediate',
     xp: 75,
     estimatedMinutes: 12,
@@ -169,7 +185,7 @@ export const INTERMEDIATE_NODES: LearningNodeItem[] = [
     number: 'Int 6',
     title: 'Rotation Gates',
     subtitle: 'Continuous angles: Rx, Ry, and Rz',
-    status: 'current',
+    status: 'upcoming',
     category: 'intermediate',
     xp: 75,
     estimatedMinutes: 10,
@@ -222,6 +238,70 @@ export const INTERMEDIATE_NODES: LearningNodeItem[] = [
     subtitle: 'Multi-qubit algorithm capstone',
     status: 'locked',
     category: 'intermediate',
+  },
+];
+export interface CurriculumSection {
+  id: string;
+  title: string;
+  subtitle: string;
+  nodeIds: string[];
+  isFuture?: boolean;
+}
+
+export const CURRICULUM_SECTIONS: CurriculumSection[] = [
+  {
+    id: 'foundations',
+    title: 'Quantum Foundations',
+    subtitle:
+      'Build the mental model of classical computing, bits, probability, qubits, quantum states, the Bloch sphere, and phase.',
+    nodeIds: [
+      'lesson-0', // Classical vs Quantum Computing
+      'lesson-1', // Bit
+      'lesson-2', // Probability
+      'lesson-3', // Qubit
+      'inter-1',  // Bloch Sphere
+      'inter-2',  // Phase Foundations
+    ],
+  },
+
+  {
+    id: 'gates',
+    title: 'Quantum Gates',
+    subtitle:
+      'Explore how phase and state transformations work through single-qubit gates and continuous rotations.',
+    nodeIds: [
+      'inter-3', // Z Gate
+      'inter-4', // Y Gate
+      'inter-5', // Single-Qubit Gate Comparison
+      'inter-6', // Rotation Gates
+    ],
+  },
+
+ {
+  id: 'circuits',
+  title: 'Quantum Circuits',
+  subtitle:
+    'Build quantum circuits, understand repeated measurements, translate circuits into Qiskit, and explore multi-qubit behavior.',
+  nodeIds: [
+    'lesson-5',  // Quantum Circuits
+    'lesson-7',  // Shots
+    'lesson-8',  // Qiskit Practice
+    'inter-7',   // Multiple Qubits
+    'inter-8',   // CNOT Gate
+    'inter-9',   // Entanglement
+    'inter-10',  // Bell State
+  ],
+},
+
+  {
+    id: 'advanced',
+    title: 'Advanced Quantum',
+    subtitle:
+      'Future expansion for noise, real hardware, advanced algorithms, and deeper quantum topics.',
+    nodeIds: [
+      'inter-11',
+    ],
+    isFuture: true,
   },
 ];
 
