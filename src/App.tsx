@@ -48,22 +48,68 @@ import { QuantumLabView } from './views/QuantumLabView';
 import { ChallengesView } from './views/ChallengesView';
 import { ProgressView } from './views/ProgressView';
 
+const AUTH_SESSION_MS =
+  30 * 24 * 60 * 60 * 1000;
+
+const AUTH_EXPIRY_KEY =
+  'qubify_auth_expires_at';
+
+const GUEST_SESSION_KEY =
+  'qubify_guest_session';
+
 const getTrackedUserIdFromStorage = (): string | null => {
   try {
-    const savedUser = localStorage.getItem('qubify_prototype_user');
+    const authenticated =
+      localStorage.getItem(
+        'qubify_is_authenticated'
+      ) === 'true';
 
-    if (!savedUser) return null;
+    const expiresAt = Number(
+      localStorage.getItem(
+        AUTH_EXPIRY_KEY
+      )
+    );
 
-    const user = JSON.parse(savedUser);
+    const savedUser =
+      localStorage.getItem(
+        'qubify_prototype_user'
+      );
 
-    if (user?.tracked === true && user?.id) {
+    if (
+      !authenticated ||
+      !savedUser ||
+      !Number.isFinite(expiresAt) ||
+      Date.now() >= expiresAt
+    ) {
+      localStorage.setItem(
+        'qubify_is_authenticated',
+        'false'
+      );
+
+      localStorage.removeItem(
+        'qubify_prototype_user'
+      );
+
+      localStorage.removeItem(
+        AUTH_EXPIRY_KEY
+      );
+
+      return null;
+    }
+
+    const user =
+      JSON.parse(savedUser);
+
+    if (
+      user?.tracked === true &&
+      user?.id
+    ) {
       return user.id;
     }
   } catch {}
 
   return null;
 };
-
 const userStorageKey = (
   userId: string,
   key: string
@@ -79,14 +125,30 @@ export default function App() {
   });
 
   // 2. Authentication State (Prototype local session)
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
-    try {
-      return localStorage.getItem('qubify_is_authenticated') === 'true';
-    } catch {
-      return false;
+const [
+  isAuthenticated,
+  setIsAuthenticated,
+] = useState<boolean>(() => {
+  try {
+    // Guest is valid only for this browser session.
+    if (
+      sessionStorage.getItem(
+        GUEST_SESSION_KEY
+      ) === 'true'
+    ) {
+      return true;
     }
-  });
 
+    // Tracked learners require a valid
+    // non-expired 30-day login.
+    return (
+      getTrackedUserIdFromStorage() !==
+      null
+    );
+  } catch {
+    return false;
+  }
+});
  // Navigation View State
 const [currentView, setCurrentView] =
   useState<AppView>('dashboard');
@@ -471,25 +533,36 @@ const handlePrototypeLogin = async (
     };
   }
 
-  try {
-    localStorage.setItem(
-      'qubify_is_authenticated',
-      'true'
-    );
+try {
+  localStorage.setItem(
+    'qubify_is_authenticated',
+    'true'
+  );
 
-    localStorage.setItem(
-      'qubify_prototype_user',
-      JSON.stringify({
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        avatar: user.avatar,
-        provider: 'demo-account',
-        tracked: true,
-      })
-    );
-  } catch {}
+  localStorage.setItem(
+    AUTH_EXPIRY_KEY,
+    String(
+      Date.now() +
+        AUTH_SESSION_MS
+    )
+  );
 
+  sessionStorage.removeItem(
+    GUEST_SESSION_KEY
+  );
+
+  localStorage.setItem(
+    'qubify_prototype_user',
+    JSON.stringify({
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      avatar: user.avatar,
+      provider: 'demo-account',
+      tracked: true,
+    })
+  );
+} catch {}
  setActiveTrackedUserId(
   user.id
 );
@@ -513,25 +586,25 @@ const handleGuestLogin = async () => {
     setTimeout(resolve, 250)
   );
 
-  try {
-    localStorage.setItem(
-      'qubify_is_authenticated',
-      'true'
-    );
+try {
+  sessionStorage.setItem(
+    GUEST_SESSION_KEY,
+    'true'
+  );
 
-    localStorage.setItem(
-      'qubify_prototype_user',
-      JSON.stringify({
-        id: 'guest',
-        name: 'Guest Learner',
-        email: null,
-        avatar: 'G',
-        provider: 'guest',
-        tracked: false,
-      })
-    );
-  } catch {}
+  localStorage.setItem(
+    'qubify_is_authenticated',
+    'false'
+  );
 
+  localStorage.removeItem(
+    'qubify_prototype_user'
+  );
+
+  localStorage.removeItem(
+    AUTH_EXPIRY_KEY
+  );
+} catch {}
   setUserStats((prev) => ({
     ...prev,
     name: 'Guest Learner',
