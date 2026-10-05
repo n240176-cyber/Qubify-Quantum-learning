@@ -706,7 +706,19 @@ print(json.dumps({
   });
 });
 app.post('/api/quantum/execute', async (req, res) => {
-  const { code, files = [], timeoutMs = 20000 } = req.body;
+const {
+  code,
+  files = [],
+  timeoutMs: requestedTimeoutMs = 45000,
+} = req.body;
+
+const timeoutMs = Math.min(
+  Math.max(
+    Number(requestedTimeoutMs) || 45000,
+    1000
+  ),
+  60000
+);
 
   if (!code || typeof code !== 'string') {
     return res.status(400).json({
@@ -715,34 +727,29 @@ app.post('/api/quantum/execute', async (req, res) => {
     });
   }
 
-  const isPublicRestrictedMode =
-    process.env.ENABLE_CODE_LAB === 'false';
+ const validation =
+  await validateRestrictedQiskitCode(code);
 
-  if (isPublicRestrictedMode) {
-    const validation = await validateRestrictedQiskitCode(code);
-
-    if (!validation.ok) {
-      return res.status(400).json({
-        success: false,
-        stdout: '',
-        stderr:
-          validation.error ||
-          'Code is not allowed in public Qiskit mode.',
-        executionTimeMs: 0,
-        error: {
-          type: 'PublicCodeValidationError',
-          rawMessage:
-            validation.error ||
-            'Code is not allowed in public Qiskit mode.',
-          qubifyExplanation:
-            'The public Qubify Code Lab allows supported Python and Qiskit operations while blocking system, filesystem, process, and network access.',
-          suggestion:
-            'Use Qiskit, Qiskit Aer, math, NumPy, supported quantum-info tools, noise models, transpilation, and circuit visualization.',
-        },
-      });
-    }
-  }
-
+if (!validation.ok) {
+  return res.status(400).json({
+    success: false,
+    stdout: '',
+    stderr:
+      validation.error ||
+      'Code is not allowed in the Qubify Code Lab.',
+    executionTimeMs: 0,
+    error: {
+      type: 'PublicCodeValidationError',
+      rawMessage:
+        validation.error ||
+        'Code is not allowed in the Qubify Code Lab.',
+      qubifyExplanation:
+        'Qubify allows supported Python and Qiskit operations while blocking system, filesystem, process, and network access.',
+      suggestion:
+        'Use Qiskit, Qiskit Aer, math, NumPy, supported quantum-info tools, noise models, transpilation, and circuit visualization.',
+    },
+  });
+}
     const runId = `QL-${Math.floor(1000 + Math.random() * 9000)}`;
 
     // 1. Package policy enforcement
@@ -974,9 +981,8 @@ with open('_qubify_out.json', 'w', encoding='utf-8') as f:
       await fs.promises.writeFile(harnessScriptPath, harnessCode, 'utf-8');
 
       // Spawn Python process in isolated runDir
-      const pythonProcess = spawn('python3', ['_qubify_harness.py'], {
+     const pythonProcess = spawn('python3', ['_qubify_harness.py'], {
   cwd: runDir,
-  timeout: Math.min(timeoutMs, 25000),
   env: {
     ...process.env,
     PYTHONUNBUFFERED: '1',
@@ -1016,7 +1022,7 @@ with open('_qubify_out.json', 'w', encoding='utf-8') as f:
             success: false,
             runId,
             stdout: procStdout,
-            stderr: `Execution stopped: Time limit exceeded (${timeoutMs / 1000}s). Check for infinite loops or reduce simulation complexity.`,
+           stderr: `Execution stopped after ${timeoutMs / 1000}s. The runtime may be busy or the program may require too much execution time. Try again, or simplify very large simulations.`,
             executionTimeMs,
           });
         }

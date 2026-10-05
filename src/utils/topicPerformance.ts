@@ -138,8 +138,8 @@ export const getWeakTopics = (
 
   return performance
     .filter(
-      (item) => item.attempts > 0
-    )
+  (item) => item.attempts >= 2
+)
     .sort((a, b) => {
       if (
         a.masteryScore !==

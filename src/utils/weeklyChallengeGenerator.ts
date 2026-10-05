@@ -156,17 +156,39 @@ export function generateWeeklyChallengeSet(
   const weekLabel = `Week ${parseInt(weekNum, 10)}`;
   const daysRemaining = getDaysRemainingInWeek();
 
-  // 1. Filter bank to ONLY challenges whose requiredLesson AND optional secondaryLesson are unlocked
-  const eligibleChallenges = CHALLENGE_BANK.filter((c) => {
-    const mainEligible = unlockedLessonIds.includes(c.requiredLesson);
-    const secondaryEligible = !c.secondaryLesson || unlockedLessonIds.includes(c.secondaryLesson);
-    return mainEligible && secondaryEligible;
-  });
+// Only use concepts from lessons the learner has COMPLETED.
+const eligibleChallenges = CHALLENGE_BANK.filter((challenge) => {
+  const mainCompleted =
+    completedLessonIds.includes(
+      challenge.requiredLesson
+    );
 
-  // Fallback safeguard: if somehow empty, allow lesson-1 questions
-  const pool = eligibleChallenges.length >= 7 
-    ? eligibleChallenges 
-    : CHALLENGE_BANK.filter((c) => c.requiredLesson === 'lesson-1' || unlockedLessonIds.includes(c.requiredLesson));
+  const secondaryCompleted =
+    !challenge.secondaryLesson ||
+    completedLessonIds.includes(
+      challenge.secondaryLesson
+    );
+
+  return mainCompleted && secondaryCompleted;
+});
+
+// Never introduce questions from unseen / unfinished lessons.
+const pool = eligibleChallenges;
+
+// Weekly practice requires enough learned questions.
+// ChallengesView also locks Weekly until this requirement is met.
+if (pool.length < 7) {
+  return {
+    weekId,
+    weekLabel,
+    generatedForLessons:
+      completedLessonIds,
+    challenges: [],
+    daysRemaining,
+    completedCount: 0,
+    isCurrentWeek: true,
+  };
+}
 
   const rng = seededRandom(`${weekId}_${learnerSeed}`);
 

@@ -263,10 +263,10 @@ print(counts)
   // Experiments
   {
     id: 'ex-11-random-bit',
-    title: '11. True Quantum Random Bit Generator',
+    title: '11. Simulated Quantum Random Bit Generator',
     category: 'experiments',
     filename: 'quantum_rng.py',
-    description: 'Generate true quantum random integers using measurement collapse.',
+    description: 'Simulate measurement-based random bits using Qiskit Aer.',
     code: `from qiskit import QuantumCircuit
 from qiskit_aer import AerSimulator
 

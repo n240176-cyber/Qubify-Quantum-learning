@@ -635,7 +635,7 @@ setSelectedLesson(
   setCurrentView('dashboard');
 };
   // Prototype logout handler (returns to login screen, keeps learning progress)
-  const handleLogout = () => {
+const handleLogout = () => {
   try {
     localStorage.setItem(
       'qubify_is_authenticated',
@@ -645,10 +645,19 @@ setSelectedLesson(
     localStorage.removeItem(
       'qubify_prototype_user'
     );
+
+    localStorage.removeItem(
+      AUTH_EXPIRY_KEY
+    );
+
+    sessionStorage.removeItem(
+      GUEST_SESSION_KEY
+    );
   } catch {}
 
   setActiveTrackedUserId(null);
   setIsAuthenticated(false);
+  setCurrentView('dashboard');
 };
 
   // Reset Prototype Progress
